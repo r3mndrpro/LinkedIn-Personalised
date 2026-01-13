@@ -369,6 +369,27 @@ const sendMessage = async (page, profileUrl, message) => {
 
         // Click send button
         await page.click('button[type="submit"].msg-form__send-button');
+        await randomDelay(1, 2);
+
+        // CRITICAL: Close the message modal after sending to prevent persistence
+        console.log(`   → Closing message modal...`);
+        const modalClosed = await page.evaluate(() => {
+            // Find the close button for the message overlay
+            const closeButton = document.querySelector('.msg-overlay-bubble-header__control[aria-label*="Close"], .msg-overlay-bubble-header__control.artdeco-button--circle');
+            if (closeButton) {
+                closeButton.click();
+                return true;
+            }
+            return false;
+        });
+
+        if (modalClosed) {
+            console.log(`   → Modal closed successfully`);
+        } else {
+            console.log(`   ⚠️  Modal close button not found (message may have auto-closed)`);
+        }
+
+        await randomDelay(1, 2);
 
         console.log(`✅ Message sent to ${profileName} (${profileUrl})`);
         return true;
