@@ -336,6 +336,13 @@ Actor.main(async () => {
         }
     };
 
+    // Log state loading for debugging
+    const savedConnectionsCount = Object.keys(state.connections || {}).length;
+    console.log(`📂 Loaded state: ${savedConnectionsCount} connections already processed`);
+    if (savedConnectionsCount > 0) {
+        console.log(`   Last 3 processed: ${Object.keys(state.connections).slice(-3).join(', ')}`);
+    }
+
     // Reset daily counter if new day
     const today = new Date().toISOString().split('T')[0];
     if (state.stats.lastResetDate !== today) {
@@ -454,7 +461,9 @@ Actor.main(async () => {
 
             // Check if already processed
             if (state.connections[profileUrl]) {
-                console.log(`⏭️  Skipping ${profileUrl} (already processed)`);
+                const savedData = state.connections[profileUrl];
+                console.log(`⏭️  Skipping ${profileUrl} (already processed on ${savedData.evaluatedDate})`);
+                console.log(`   Category: ${savedData.category}, Message Sent: ${savedData.messageSent}`);
                 continue;
             }
 
@@ -530,6 +539,7 @@ Actor.main(async () => {
 
             // Save state after each evaluation
             await Actor.setValue('STATE', state);
+            console.log(`💾 State saved: ${Object.keys(state.connections).length} total connections processed`);
             await randomDelay(minDelay, maxDelay);
         }
 
@@ -539,6 +549,11 @@ Actor.main(async () => {
         console.log(`   Total messages sent (all time): ${state.stats.totalMessagesSent}`);
         console.log(`   Messages sent today: ${state.stats.todayCount}/${maxMessagesPerDay}`);
         console.log(`   Messages sent this run: ${messagesSentThisRun}/${messagesPerRun}`);
+
+        // Final state save
+        await Actor.setValue('STATE', state);
+        console.log(`\n💾 Final state saved: ${Object.keys(state.connections).length} connections in memory`);
+        console.log(`   State will persist for next run`);
 
     } catch (error) {
         console.error('❌ Error:', error);
