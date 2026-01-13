@@ -157,67 +157,90 @@ const generateMessage = async (genAI, profileData, demoUrl) => {
         // Pick a random messaging style (1-4)
         const styles = [
             {
-                name: 'Problem-Aware',
-                approach: 'Direct and problem-focused. Identify their industry/role, point out voice AI opportunity, emphasize control + cost benefits. Short and punchy.'
+                name: 'Situation-Aware',
+                approach: 'Frame around a situation they\'re likely experiencing (cost walls, vendor lock-in, scaling issues). Don\'t pitch features, describe the problem space they recognize. Then mention you built a way around it.'
             },
             {
-                name: 'Cost/ROI Focus',
-                approach: 'Lead with 70% cost savings vs traditional platforms ($0.08/min vs $0.25/min). Show scale benefits. Emphasize ownership vs subscription. Quantitative value.'
+                name: 'Transition/Moment',
+                approach: 'Reference a career transition, industry shift, or role change from their Experience. Frame the platform as relevant to their new context. "Saw you moved from X to Y" or "noticed your background in Z".'
             },
             {
-                name: 'Builder/Technical',
-                approach: 'Appeal to technical decision-makers. Emphasize full control, no black boxes, sub-1s latency. Mention easy deployment. Collaborative tone.'
+                name: 'Risk/Opportunity',
+                approach: 'Highlight a missed opportunity or hidden risk in their current voice AI approach (if they use it). Position as someone who solved the same problem. Advisory tone, not vendor tone.'
             },
             {
-                name: 'Curiosity/Demo',
-                approach: 'Show real working demo upfront. Non-pushy, value-first. "Built something cool for [industry], check it out." Easy CTA.'
+                name: 'Builder-to-Builder',
+                approach: 'Technical credibility. Reference their technical background (if any) or builder mentality. "Built something for teams like yours" framing. Collaborative, peer-to-peer tone. Demo-first.'
             }
         ];
 
         const style = styles[Math.floor(Math.random() * styles.length)];
 
-        const prompt = `You are a professional reaching out on LinkedIn about a Voice AI platform you built. Write a natural, conversational DM.
+        const prompt = `You are a professional reaching out on LinkedIn about a Voice AI infrastructure you built. Write a natural, human-sounding DM.
 
-RECIPIENT:
+RECIPIENT PROFILE:
 Name: ${profileData.name}
 Headline: ${profileData.headline}
 Company: ${profileData.company}
 Experience: ${profileData.experience}
 
-YOUR PLATFORM:
-Voice AI infrastructure that's 70% cheaper ($0.08/min vs $0.25/min competitors) with full control and sub-1s latency.
+WHAT YOU BUILT:
+Voice AI infrastructure - 70% cheaper than competitors ($0.08/min vs $0.25/min), full control, sub-1s latency.
 Demo: ${demoUrl}
 
 MESSAGING APPROACH: ${style.name}
 ${style.approach}
 
+CRITICAL FRAMING RULES:
+1. DON'T frame as a vendor selling a tool
+   ❌ "Built a voice AI platform that cuts costs..."
+   ✅ "Most teams hit a cost wall with voice AI around month 3..."
+
+2. Frame around SITUATIONS, not features:
+   - Situations they're experiencing (cost walls, vendor lock-in, scaling issues)
+   - Transitions they're navigating (new role, new company, growing team)
+   - Risks they're managing (hidden costs, lack of control)
+   - Opportunities they might not see yet
+
+3. VARY THE HOOK - Don't use "Noticed you're scaling [X] at [Company]"
+   Instead use Experience data creatively:
+   ✅ "Saw your background in [industry] before joining [Company]..."
+   ✅ "Interesting to see someone with [technical skill] leading [department]..."
+   ✅ "Congrats on the move to [Company]—noticed you're heading up [role]..."
+   ✅ Reference career transitions, industry shifts, or role changes from Experience field
+
 PROFESSIONAL SALES PRINCIPLES:
-1. Lead with THEM, not YOU - reference their role/company specifically
-2. One clear value point - don't list features like a brochure
-3. Conversational tone - write like you're texting a colleague
-4. Soft CTA - "curious if this fits your stack" not "let's schedule a call"
-5. Show, don't tell - link to the demo naturally
-6. No hype words - avoid "game-changing", "revolutionary", etc.
-7. Keep it ultra-short - 2-3 sentences max
+1. Lead with THEM (their situation), not YOU (your product)
+2. ONE value point max - don't list features
+3. Write like texting a colleague, not pitching a prospect
+4. Soft CTA - "curious if this fits" not "let's chat"
+5. Ultra-short: 2-3 sentences max
+6. No hype words (game-changing, revolutionary, cutting-edge)
 
-BAD EXAMPLE (too salesy):
-"Hi John, with XYZ managing 250+ clients, I thought you'd value cutting Voice AI costs by 70%. We offer $0.08/min vs $0.25/min with sub-1s speed and full ownership. Worth a quick chat?"
+BAD EXAMPLE (feature-dump + vendor tone):
+"Hi Sarah, built a voice AI platform that cuts costs to $0.08/min with full control and sub-1s latency. We help teams scale without vendor lock-in. Worth a quick chat?"
+→ Problem: Sounds like a vendor selling features
 
-GOOD EXAMPLE (natural):
-"Hey John, noticed you're scaling voice solutions at XYZ. Built something that might fit your stack - cuts costs to $0.08/min with full control. Demo here: [link] if you're curious."
+GOOD EXAMPLE (situation-framing + natural tone):
+"Hey Sarah, saw your background in fintech before moving to operations at Acme. If you're exploring voice AI for support, most teams hit a pricing wall fast—we built a way around that. Demo here: [link]"
+→ Why it works: References her transition, frames around a situation, not a pitch
+
+ANOTHER GOOD EXAMPLE:
+"Hey Mike, most teams evaluating voice agents find the $0.25/min costs don't scale. Built something at $0.08/min with full ownership—demo here: [link] if you're curious."
+→ Why it works: Describes the situation first, solution second
 
 REQUIREMENTS:
-✅ First name only
-✅ Reference their specific role/company
-✅ ONE value point (cost OR control OR speed, not all three)
+✅ Use first name only
+✅ Reference their Experience data if possible (transitions, background, previous roles)
+✅ Frame around a situation/moment, NOT a feature list
 ✅ Include demo link: ${demoUrl}
-✅ 2-3 sentences max
+✅ 2-3 sentences maximum
 ✅ Natural, conversational tone
 ✅ Soft, low-pressure CTA
-❌ No feature lists or bullet points
-❌ No pushy language
-❌ No emojis
-❌ No hype words
+❌ NO generic "Noticed you're scaling X at Y" hooks
+❌ NO feature lists or vendor speak
+❌ NO pushy language
+❌ NO emojis or hype words
 
 Write ONLY the message text:`;
 
