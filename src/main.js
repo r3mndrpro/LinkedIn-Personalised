@@ -377,23 +377,49 @@ const sendMessage = async (page, profileUrl, message) => {
 
         // CRITICAL: Close the message modal after sending to prevent persistence
         console.log(`   → Closing message modal...`);
-        const modalClosed = await page.evaluate(() => {
-            // Find the close button for the message overlay
-            const closeButton = document.querySelector('.msg-overlay-bubble-header__control[aria-label*="Close"], .msg-overlay-bubble-header__control.artdeco-button--circle');
-            if (closeButton) {
-                closeButton.click();
-                return true;
-            }
-            return false;
-        });
 
-        if (modalClosed) {
-            console.log(`   → Modal closed successfully`);
-        } else {
-            console.log(`   ⚠️  Modal close button not found (message may have auto-closed)`);
+        // Try to close modal multiple times with retries
+        let modalClosedSuccessfully = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const modalClosed = await page.evaluate(() => {
+                // Find the close button for the message overlay
+                const closeButton = document.querySelector('.msg-overlay-bubble-header__control[aria-label*="Close"], .msg-overlay-bubble-header__control.artdeco-button--circle');
+                if (closeButton && closeButton.offsetParent !== null) {
+                    closeButton.click();
+                    return true;
+                }
+                return false;
+            });
+
+            if (modalClosed) {
+                console.log(`   → Close button clicked (attempt ${attempt})`);
+                await randomDelay(2, 3); // Wait for modal to close
+
+                // Verify modal is actually gone
+                const modalGone = await page.evaluate(() => {
+                    const modal = document.querySelector('.msg-overlay-bubble-header, .msg-overlay-container');
+                    return !modal || modal.offsetParent === null;
+                });
+
+                if (modalGone) {
+                    console.log(`   → Modal verified closed`);
+                    modalClosedSuccessfully = true;
+                    break;
+                } else {
+                    console.log(`   → Modal still visible, retrying...`);
+                }
+            } else {
+                console.log(`   → Close button not found (attempt ${attempt})`);
+                await randomDelay(1, 2);
+            }
         }
 
-        await randomDelay(1, 2);
+        if (!modalClosedSuccessfully) {
+            console.log(`   ⚠️  Warning: Could not verify modal closed after 3 attempts`);
+        }
+
+        // Extra safety delay before returning
+        await randomDelay(2, 3);
 
         console.log(`✅ Message sent to ${profileName} (${profileUrl})`);
         return true;
