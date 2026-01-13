@@ -115,8 +115,9 @@ Profile:
 Name: ${profileData.name}
 Headline: ${profileData.headline}
 Company: ${profileData.company}
-About: ${profileData.about}
 Location: ${profileData.location}
+Experience: ${profileData.experience}
+About: ${profileData.about}
 
 Respond ONLY with a JSON object in this exact format:
 {
@@ -181,8 +182,9 @@ RECIPIENT PROFILE:
 Name: ${profileData.name}
 Headline: ${profileData.headline}
 Company: ${profileData.company}
-About: ${profileData.about}
 Location: ${profileData.location}
+Experience: ${profileData.experience}
+About: ${profileData.about}
 
 WHAT YOU'RE PROMOTING:
 - Voice AI Platform: Build custom voice agents with full control
@@ -429,6 +431,10 @@ Actor.main(async () => {
 
             console.log(`   Name: ${profileData.name}`);
             console.log(`   Headline: ${profileData.headline}`);
+            console.log(`   Company: ${profileData.company || 'N/A'}`);
+            console.log(`   Location: ${profileData.location || 'N/A'}`);
+            console.log(`   Experience: ${profileData.experience || 'N/A'}`);
+            console.log(`   About: ${profileData.about ? profileData.about.substring(0, 100) + '...' : 'N/A'}`);
 
             await randomDelay(minDelay, maxDelay);
 
