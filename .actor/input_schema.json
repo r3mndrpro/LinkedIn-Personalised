@@ -18,6 +18,13 @@
       "editor": "textfield",
       "isSecret": true
     },
+    "supabaseFunctionUrl": {
+      "title": "Supabase Edge Function URL",
+      "type": "string",
+      "description": "Full URL to your Supabase edge function (e.g., https://xxx.supabase.co/functions/v1/quick-function)",
+      "editor": "textfield",
+      "example": "https://qazukrjeffpoktdnfntr.supabase.co/functions/v1/quick-function"
+    },
     "messagesPerRun": {
       "title": "Messages Per Run",
       "type": "integer",
@@ -58,5 +65,5 @@
       "maximum": 60
     }
   },
-  "required": ["linkedinSessionCookie", "geminiApiKey"]
+  "required": ["linkedinSessionCookie", "geminiApiKey", "supabaseFunctionUrl"]
 }

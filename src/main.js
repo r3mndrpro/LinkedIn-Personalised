@@ -1,6 +1,7 @@
 import { Actor } from 'apify';
 import { chromium } from 'playwright';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { checkProfile, saveProfile } from './supabase-client.js';
 
 // Helper function for random delays
 const randomDelay = (min, max) => {
@@ -273,12 +274,15 @@ Write ONLY the message text:`;
         const message = result.response.text().trim();
 
         console.log(`   Style used: ${style.name}`);
-        return message;
+        return { message, style: style.name };
     } catch (error) {
         console.log('Error generating message:', error.message);
         // Fallback message
         const firstName = profileData.name.split(' ')[0];
-        return `Hey ${firstName}, built a voice AI platform that cuts costs 70% vs traditional providers. Full control, <1s latency. Check it out: ${demoUrl} - open to a quick chat?`;
+        return {
+            message: `Hey ${firstName}, built a voice AI platform that cuts costs 70% vs traditional providers. Full control, <1s latency. Check it out: ${demoUrl} - open to a quick chat?`,
+            style: 'Fallback'
+        };
     }
 };
 
@@ -406,6 +410,7 @@ Actor.main(async () => {
     const {
         linkedinSessionCookie,
         geminiApiKey,
+        supabaseFunctionUrl,
         messagesPerRun = 4,
         maxMessagesPerDay = 30,
         demoUrl = 'https://voicecallai.netlify.app/',
@@ -416,42 +421,8 @@ Actor.main(async () => {
     // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(geminiApiKey);
 
-    // Load or initialize state
-    let state = await Actor.getValue('STATE') || {
-        connections: {},
-        stats: {
-            totalEvaluated: 0,
-            totalDecisionMakers: 0,
-            totalMessagesSent: 0,
-            todayCount: 0,
-            lastResetDate: new Date().toISOString().split('T')[0]
-        }
-    };
-
-    // Log state loading for debugging
-    const savedConnectionsCount = Object.keys(state.connections || {}).length;
-    console.log(`📂 Loaded state: ${savedConnectionsCount} connections already processed`);
-    if (savedConnectionsCount > 0) {
-        console.log(`   Last 3 processed: ${Object.keys(state.connections).slice(-3).join(', ')}`);
-    }
-
-    // Reset daily counter if new day
-    const today = new Date().toISOString().split('T')[0];
-    if (state.stats.lastResetDate !== today) {
-        state.stats.todayCount = 0;
-        state.stats.lastResetDate = today;
-        await Actor.setValue('STATE', state);
-        console.log('📅 New day - reset daily counter');
-    }
-
-    // Check if we've hit daily limit
-    if (state.stats.todayCount >= maxMessagesPerDay) {
-        console.log(`🛑 Daily limit reached (${state.stats.todayCount}/${maxMessagesPerDay}). Stopping.`);
-        await Actor.exit();
-        return;
-    }
-
-    console.log(`📊 Current stats: ${state.stats.todayCount}/${maxMessagesPerDay} messages sent today`);
+    console.log(`📊 Using Supabase for state persistence: ${supabaseFunctionUrl}`);
+    console.log(`📊 Target: ${messagesPerRun} messages this run, max ${maxMessagesPerDay} per day`);
 
     // Launch browser
     console.log('🚀 Launching stealth browser...');
@@ -536,6 +507,8 @@ Actor.main(async () => {
         console.log(`📋 Found ${connectionUrls.length} connections to process`);
 
         let messagesSentThisRun = 0;
+        let evaluatedThisRun = 0;
+        let decisionMakersFoundThisRun = 0;
 
         // Process each connection
         for (const profileUrl of connectionUrls) {
@@ -545,21 +518,17 @@ Actor.main(async () => {
                 break;
             }
 
-            // Stop if we've hit daily limit
-            if (state.stats.todayCount >= maxMessagesPerDay) {
-                console.log(`🛑 Daily limit reached (${state.stats.todayCount}/${maxMessagesPerDay}). Stopping.`);
-                break;
-            }
+            // Check if already processed in Supabase
+            console.log(`\n🔍 Checking: ${profileUrl}`);
+            const { exists, profile } = await checkProfile(supabaseFunctionUrl, profileUrl);
 
-            // Check if already processed
-            if (state.connections[profileUrl]) {
-                const savedData = state.connections[profileUrl];
-                console.log(`⏭️  Skipping ${profileUrl} (already processed on ${savedData.evaluatedDate})`);
-                console.log(`   Category: ${savedData.category}, Message Sent: ${savedData.messageSent}`);
+            if (exists) {
+                console.log(`⏭️  Skipping (already processed on ${profile.evaluated_at})`);
+                console.log(`   Category: ${profile.category}, Message Sent: ${profile.message_sent}`);
                 continue;
             }
 
-            console.log(`\n🔍 Processing: ${profileUrl}`);
+            console.log(`🔍 Processing: ${profileUrl}`);
 
             // Extract profile info
             const profileData = await extractProfileInfo(page, profileUrl);
@@ -584,68 +553,84 @@ Actor.main(async () => {
             console.log(`   Category: ${evaluation.category}`);
             console.log(`   Confidence: ${evaluation.confidence}`);
 
-            // Save to state
-            state.connections[profileUrl] = {
-                name: profileData.name,
-                headline: profileData.headline,
-                company: profileData.company,
-                evaluated: true,
-                isDecisionMaker: evaluation.isDecisionMaker,
-                category: evaluation.category,
-                confidence: evaluation.confidence,
-                messageSent: false,
-                evaluatedDate: new Date().toISOString()
-            };
+            evaluatedThisRun++;
 
-            state.stats.totalEvaluated++;
-
-            if (evaluation.isDecisionMaker) {
-                state.stats.totalDecisionMakers++;
-
-                // Generate personalized message
-                console.log('✍️  Generating personalized message...');
-                const message = await generateMessage(genAI, profileData, demoUrl);
-                console.log(`   Message: ${message}`);
-
+            // If NOT decision maker, save to Supabase immediately and skip
+            if (!evaluation.isDecisionMaker) {
+                console.log('💾 Saving non-decision-maker to Supabase...');
+                await saveProfile(supabaseFunctionUrl, {
+                    profile_url: profileUrl,
+                    name: profileData.name,
+                    headline: profileData.headline,
+                    company: profileData.company,
+                    location: profileData.location,
+                    experience: profileData.experience,
+                    about: profileData.about,
+                    is_decision_maker: false,
+                    category: evaluation.category,
+                    confidence: evaluation.confidence,
+                    reasoning: evaluation.reasoning,
+                    message_sent: false,
+                    evaluated_at: new Date().toISOString()
+                });
+                console.log('✅ Saved to Supabase');
                 await randomDelay(minDelay, maxDelay);
-
-                // Send message
-                console.log('📤 Sending message...');
-                const sent = await sendMessage(page, profileUrl, message);
-
-                if (sent) {
-                    state.connections[profileUrl].messageSent = true;
-                    state.connections[profileUrl].message = message;
-                    state.connections[profileUrl].sentDate = new Date().toISOString();
-                    state.stats.totalMessagesSent++;
-                    state.stats.todayCount++;
-                    messagesSentThisRun++;
-
-                    console.log(`✅ SUCCESS! Sent ${messagesSentThisRun}/${messagesPerRun} this run, ${state.stats.todayCount}/${maxMessagesPerDay} today`);
-                }
-
-                // Save state after each message
-                await Actor.setValue('STATE', state);
-                await randomDelay(minDelay, maxDelay);
+                continue; // Skip to next profile
             }
 
-            // Save state after each evaluation
-            await Actor.setValue('STATE', state);
-            console.log(`💾 State saved: ${Object.keys(state.connections).length} total connections processed`);
+            // Decision maker found!
+            decisionMakersFoundThisRun++;
+            console.log(`🎯 Decision maker found! (${decisionMakersFoundThisRun} this run)`);
+
+            // Generate personalized message
+            console.log('✍️  Generating personalized message...');
+            const { message, style } = await generateMessage(genAI, profileData, demoUrl);
+            console.log(`   Message: ${message}`);
+
+            await randomDelay(minDelay, maxDelay);
+
+            // Send message
+            console.log('📤 Sending message...');
+            const sent = await sendMessage(page, profileUrl, message);
+
+            if (sent) {
+                messagesSentThisRun++;
+                console.log(`✅ SUCCESS! Sent ${messagesSentThisRun}/${messagesPerRun} this run`);
+
+                // Save to Supabase with message data
+                console.log('💾 Saving decision-maker with message to Supabase...');
+                await saveProfile(supabaseFunctionUrl, {
+                    profile_url: profileUrl,
+                    name: profileData.name,
+                    headline: profileData.headline,
+                    company: profileData.company,
+                    location: profileData.location,
+                    experience: profileData.experience,
+                    about: profileData.about,
+                    is_decision_maker: true,
+                    category: evaluation.category,
+                    confidence: evaluation.confidence,
+                    reasoning: evaluation.reasoning,
+                    message_sent: true,
+                    message_text: message,
+                    message_style: style,
+                    evaluated_at: new Date().toISOString(),
+                    message_sent_at: new Date().toISOString()
+                });
+                console.log('✅ Saved to Supabase');
+            } else {
+                console.log('❌ Message failed to send, not saving to Supabase');
+            }
+
             await randomDelay(minDelay, maxDelay);
         }
 
-        console.log('\n📊 Final Stats:');
-        console.log(`   Total evaluated: ${state.stats.totalEvaluated}`);
-        console.log(`   Total decision makers found: ${state.stats.totalDecisionMakers}`);
-        console.log(`   Total messages sent (all time): ${state.stats.totalMessagesSent}`);
-        console.log(`   Messages sent today: ${state.stats.todayCount}/${maxMessagesPerDay}`);
+        console.log('\n📊 Run Complete! Stats:');
+        console.log(`   Profiles evaluated this run: ${evaluatedThisRun}`);
+        console.log(`   Decision makers found this run: ${decisionMakersFoundThisRun}`);
         console.log(`   Messages sent this run: ${messagesSentThisRun}/${messagesPerRun}`);
-
-        // Final state save
-        await Actor.setValue('STATE', state);
-        console.log(`\n💾 Final state saved: ${Object.keys(state.connections).length} connections in memory`);
-        console.log(`   State will persist for next run`);
+        console.log(`\n💾 All data saved to Supabase`);
+        console.log(`   View your data at: ${supabaseFunctionUrl.replace('/functions/v1/quick-function', '')}/project/default/editor`);
 
     } catch (error) {
         console.error('❌ Error:', error);
