@@ -176,38 +176,50 @@ const generateMessage = async (genAI, profileData, demoUrl) => {
 
         const style = styles[Math.floor(Math.random() * styles.length)];
 
-        const prompt = `You are writing a LinkedIn DM to a decision-maker about a Voice AI platform.
+        const prompt = `You are a professional reaching out on LinkedIn about a Voice AI platform you built. Write a natural, conversational DM.
 
-RECIPIENT PROFILE:
+RECIPIENT:
 Name: ${profileData.name}
 Headline: ${profileData.headline}
 Company: ${profileData.company}
-Location: ${profileData.location}
 Experience: ${profileData.experience}
-About: ${profileData.about}
 
-WHAT YOU'RE PROMOTING:
-- Voice AI Platform: Build custom voice agents with full control
-- 70% Cost Savings: $0.08/min vs $0.25/min (traditional platforms like Vapi, Bland, Retell)
-- Sub-1s response time, production-ready
-- Full control, no black boxes, easy deployment
-- Demo link: ${demoUrl}
+YOUR PLATFORM:
+Voice AI infrastructure that's 70% cheaper ($0.08/min vs $0.25/min competitors) with full control and sub-1s latency.
+Demo: ${demoUrl}
 
-MESSAGING STYLE: ${style.name}
+MESSAGING APPROACH: ${style.name}
 ${style.approach}
 
-REQUIREMENTS:
-✅ Use their first name only
-✅ Personalize based on their role/industry/company
-✅ Include the demo link naturally (${demoUrl})
-✅ Clear, straight to the point
-✅ Keep under 300 characters (LinkedIn limit)
-✅ Sound like a human, not a bot
-✅ Clear CTA (quick chat, check demo, etc.)
-❌ Don't be pushy or overly salesy
-❌ Don't use emojis unless it fits naturally
+PROFESSIONAL SALES PRINCIPLES:
+1. Lead with THEM, not YOU - reference their role/company specifically
+2. One clear value point - don't list features like a brochure
+3. Conversational tone - write like you're texting a colleague
+4. Soft CTA - "curious if this fits your stack" not "let's schedule a call"
+5. Show, don't tell - link to the demo naturally
+6. No hype words - avoid "game-changing", "revolutionary", etc.
+7. Keep it ultra-short - 2-3 sentences max
 
-Respond with ONLY the message text, nothing else.`;
+BAD EXAMPLE (too salesy):
+"Hi John, with XYZ managing 250+ clients, I thought you'd value cutting Voice AI costs by 70%. We offer $0.08/min vs $0.25/min with sub-1s speed and full ownership. Worth a quick chat?"
+
+GOOD EXAMPLE (natural):
+"Hey John, noticed you're scaling voice solutions at XYZ. Built something that might fit your stack - cuts costs to $0.08/min with full control. Demo here: [link] if you're curious."
+
+REQUIREMENTS:
+✅ First name only
+✅ Reference their specific role/company
+✅ ONE value point (cost OR control OR speed, not all three)
+✅ Include demo link: ${demoUrl}
+✅ 2-3 sentences max
+✅ Natural, conversational tone
+✅ Soft, low-pressure CTA
+❌ No feature lists or bullet points
+❌ No pushy language
+❌ No emojis
+❌ No hype words
+
+Write ONLY the message text:`;
 
         const result = await model.generateContent(prompt);
         const message = result.response.text().trim();
