@@ -340,75 +340,6 @@ const sendMessage = async (page, profileUrl, message) => {
         await page.waitForSelector('.msg-form__contenteditable, [role="textbox"]', { timeout: 10000 });
         await randomDelay(1, 2);
 
-        // CRITICAL: Verify we're messaging the correct person
-        let conversationName = await page.evaluate(() => {
-            // Check conversation header for recipient name
-            const headerName = document.querySelector('.msg-overlay-bubble-header__title, .msg-thread-header__title');
-            return headerName ? headerName.innerText.trim() : '';
-        });
-
-        console.log(`   → Conversation with: ${conversationName}`);
-
-        // Verify names match (basic check - first name should appear in both)
-        const profileFirstName = profileName.split(' ')[0].toLowerCase();
-        let conversationLower = conversationName.toLowerCase();
-
-        // RECOVERY: If mismatch detected, close wrong modal and reopen correct one
-        if (profileFirstName && !conversationLower.includes(profileFirstName)) {
-            console.log(`   ⚠️  MISMATCH detected! Profile: ${profileName} but conversation: ${conversationName}`);
-            console.log(`   → Attempting recovery: closing wrong modal...`);
-
-            // Close the wrong modal
-            await page.evaluate(() => {
-                const closeButton = document.querySelector('.msg-overlay-bubble-header__control[aria-label*="Close"], .msg-overlay-bubble-header__control.artdeco-button--circle');
-                if (closeButton) {
-                    closeButton.click();
-                }
-            });
-            await randomDelay(2, 3);
-
-            // Find and click the correct Message button on current profile
-            console.log(`   → Finding Message button on ${profileName}'s profile...`);
-            const messageButtonFound = await page.evaluate(() => {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const messageButton = buttons.find(btn =>
-                    btn.innerText.toLowerCase().includes('message') &&
-                    !btn.disabled
-                );
-                if (messageButton) {
-                    messageButton.click();
-                    return true;
-                }
-                return false;
-            });
-
-            if (!messageButtonFound) {
-                throw new Error(`❌ Recovery failed: Message button not found on ${profileName}'s profile`);
-            }
-
-            await randomDelay(2, 3);
-
-            // Wait for correct message input
-            await page.waitForSelector('.msg-form__contenteditable, [role="textbox"]', { timeout: 10000 });
-            await randomDelay(1, 2);
-
-            // Verify we now have the correct conversation
-            conversationName = await page.evaluate(() => {
-                const headerName = document.querySelector('.msg-overlay-bubble-header__title, .msg-thread-header__title');
-                return headerName ? headerName.innerText.trim() : '';
-            });
-
-            console.log(`   → New conversation with: ${conversationName}`);
-            conversationLower = conversationName.toLowerCase();
-
-            // Final verification
-            if (profileFirstName && !conversationLower.includes(profileFirstName)) {
-                throw new Error(`❌ Recovery failed: Still wrong conversation (${conversationName} instead of ${profileName})`);
-            }
-
-            console.log(`   ✅ Recovery successful! Now messaging correct person`);
-        }
-
         // Clear any existing text in the input field
         await page.evaluate(() => {
             const input = document.querySelector('.msg-form__contenteditable, [role="textbox"]');
@@ -430,49 +361,18 @@ const sendMessage = async (page, profileUrl, message) => {
         // CRITICAL: Close the message modal after sending to prevent persistence
         console.log(`   → Closing message modal...`);
 
-        // Try to close modal (1 retry max)
-        let modalClosedSuccessfully = false;
-        for (let attempt = 1; attempt <= 2; attempt++) {
-            const modalClosed = await page.evaluate(() => {
-                // Find the close button for the message overlay
-                const closeButton = document.querySelector('.msg-overlay-bubble-header__control[aria-label*="Close"], .msg-overlay-bubble-header__control.artdeco-button--circle');
-                if (closeButton && closeButton.offsetParent !== null) {
-                    closeButton.click();
-                    return true;
-                }
-                return false;
-            });
-
-            if (modalClosed) {
-                console.log(`   → Close button clicked (attempt ${attempt})`);
-                await randomDelay(2, 3); // Wait for modal to close
-
-                // Verify modal is actually gone
-                const modalGone = await page.evaluate(() => {
-                    const modal = document.querySelector('.msg-overlay-bubble-header, .msg-overlay-container');
-                    return !modal || modal.offsetParent === null;
-                });
-
-                if (modalGone) {
-                    console.log(`   → Modal verified closed`);
-                    modalClosedSuccessfully = true;
-                    break;
-                } else if (attempt === 1) {
-                    console.log(`   → Modal still visible, retrying once...`);
-                }
-            } else {
-                console.log(`   → Close button not found (attempt ${attempt})`);
-                if (attempt === 1) {
-                    await randomDelay(1, 2);
-                }
+        // Click X button
+        await page.evaluate(() => {
+            const closeButton = document.querySelector('.msg-overlay-bubble-header__control[aria-label*="Close"], .msg-overlay-bubble-header__control.artdeco-button--circle');
+            if (closeButton) {
+                closeButton.click();
             }
-        }
+        });
 
-        if (!modalClosedSuccessfully) {
-            console.log(`   ⚠️  Warning: Could not verify modal closed after 2 attempts (will recover on next profile if needed)`);
-        }
+        // Press ESC key (double guarantee)
+        await page.keyboard.press('Escape');
 
-        // Extra safety delay before returning
+        console.log(`   → Modal closed (X button + ESC key)`);
         await randomDelay(2, 3);
 
         console.log(`✅ Message sent to ${profileName} (${profileUrl})`);
