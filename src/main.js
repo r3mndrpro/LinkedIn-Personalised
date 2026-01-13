@@ -157,16 +157,16 @@ const generateMessage = async (genAI, profileData, demoUrl) => {
         // Pick a random messaging style (1-4)
         const styles = [
             {
-                name: 'Situation-Aware',
-                approach: 'Frame around a situation they\'re likely experiencing (cost walls, vendor lock-in, scaling issues). Don\'t pitch features, describe the problem space they recognize. Then mention you built a way around it.'
+                name: 'Ownership/Control',
+                approach: 'Frame around owning vs renting infrastructure. Most teams eventually want full control over their voice AI stack. Don\'t pitch features, describe the transition from dependency to ownership. Natural, advisory tone.'
             },
             {
                 name: 'Transition/Moment',
                 approach: 'Reference a career transition, industry shift, or role change from their Experience. Frame the platform as relevant to their new context. "Saw you moved from X to Y" or "noticed your background in Z".'
             },
             {
-                name: 'Risk/Opportunity',
-                approach: 'Highlight a missed opportunity or hidden risk in their current voice AI approach (if they use it). Position as someone who solved the same problem. Advisory tone, not vendor tone.'
+                name: 'Black Box Frustration',
+                approach: 'Highlight the black-box problem with most voice AI platforms. Teams can\'t customize, can\'t see what\'s happening, can\'t deploy their way. Position as someone who built transparent infrastructure. Problem-aware tone.'
             },
             {
                 name: 'Builder-to-Builder',
@@ -185,7 +185,7 @@ Company: ${profileData.company}
 Experience: ${profileData.experience}
 
 WHAT YOU BUILT:
-Voice AI infrastructure - 70% cheaper than competitors ($0.08/min vs $0.25/min), full control, sub-1s latency.
+Voice AI infrastructure that gives teams full control and ownership. Sub-1s latency, no black boxes, deploy however you want. Built for teams that want to own their voice AI stack, not rent it.
 Demo: ${demoUrl}
 
 MESSAGING APPROACH: ${style.name}
@@ -194,13 +194,13 @@ ${style.approach}
 CRITICAL FRAMING RULES:
 1. DON'T frame as a vendor selling a tool
    ❌ "Built a voice AI platform that cuts costs..."
-   ✅ "Most teams hit a cost wall with voice AI around month 3..."
+   ✅ "Most teams building voice agents eventually want control over their stack..."
 
 2. Frame around SITUATIONS, not features:
-   - Situations they're experiencing (cost walls, vendor lock-in, scaling issues)
+   - Situations they're experiencing (vendor lock-in, customization limits, black-box systems)
    - Transitions they're navigating (new role, new company, growing team)
-   - Risks they're managing (hidden costs, lack of control)
-   - Opportunities they might not see yet
+   - Risks they're managing (lack of control, can't customize, dependent on external APIs)
+   - Opportunities they might not see yet (owning vs renting infrastructure)
 
 3. VARY THE HOOK - Don't use "Noticed you're scaling [X] at [Company]"
    Instead use Experience data creatively:
@@ -218,16 +218,16 @@ PROFESSIONAL SALES PRINCIPLES:
 6. No hype words (game-changing, revolutionary, cutting-edge)
 
 BAD EXAMPLE (feature-dump + vendor tone):
-"Hi Sarah, built a voice AI platform that cuts costs to $0.08/min with full control and sub-1s latency. We help teams scale without vendor lock-in. Worth a quick chat?"
-→ Problem: Sounds like a vendor selling features
+"Hi Sarah, built a voice AI platform with sub-1s latency and full control. We help teams scale without vendor lock-in. Worth a quick chat?"
+→ Problem: Sounds like a vendor selling features, no context about them
 
 GOOD EXAMPLE (situation-framing + natural tone):
-"Hey Sarah, saw your background in fintech before moving to operations at Acme. If you're exploring voice AI for support, most teams hit a pricing wall fast—we built a way around that. Demo here: [link]"
-→ Why it works: References her transition, frames around a situation, not a pitch
+"Hey Sarah, saw your background in fintech before moving to operations at Acme. Most teams building voice AI eventually want to own their stack instead of renting it—built something for that. Demo here: [link]"
+→ Why it works: References her transition, frames around ownership, not features
 
 ANOTHER GOOD EXAMPLE:
-"Hey Mike, most teams evaluating voice agents find the $0.25/min costs don't scale. Built something at $0.08/min with full ownership—demo here: [link] if you're curious."
-→ Why it works: Describes the situation first, solution second
+"Hey Mike, if you're exploring voice agents, most platforms end up being black boxes you can't customize. Built infrastructure that gives you full control—demo here: [link] if you're curious."
+→ Why it works: Describes their likely frustration (black boxes), positions as solution to real problem
 
 REQUIREMENTS:
 ✅ Use first name only
@@ -237,6 +237,9 @@ REQUIREMENTS:
 ✅ 2-3 sentences maximum
 ✅ Natural, conversational tone
 ✅ Soft, low-pressure CTA
+✅ Focus on actual value: control, ownership, customization, transparency
+❌ NO price mentions ($0.08/min, 70% cheaper, etc.)
+❌ NO competitor comparisons (Vapi, Bland, Retell, or any other services)
 ❌ NO generic "Noticed you're scaling X at Y" hooks
 ❌ NO feature lists or vendor speak
 ❌ NO pushy language
