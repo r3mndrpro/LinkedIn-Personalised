@@ -22,7 +22,8 @@ const humanScroll = async (page) => {
 // Extract profile information
 const extractProfileInfo = async (page, profileUrl) => {
     try {
-        await page.goto(profileUrl, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForSelector('h1', { timeout: 15000 });
         await randomDelay(2, 4);
         await humanScroll(page);
 
@@ -167,7 +168,8 @@ Respond with ONLY the message text, nothing else.`;
 // Send LinkedIn message
 const sendMessage = async (page, profileUrl, message) => {
     try {
-        await page.goto(profileUrl, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForSelector('button', { timeout: 15000 });
         await randomDelay(2, 4);
         await humanScroll(page);
 
@@ -277,6 +279,10 @@ Actor.main(async () => {
     const page = await context.newPage();
 
     try {
+        // Set page timeouts (Apify containers are slower)
+        page.setDefaultTimeout(60000);
+        page.setDefaultNavigationTimeout(60000);
+
         // Inject LinkedIn session cookie
         console.log('🔐 Injecting LinkedIn session cookie...');
         await context.addCookies([
@@ -291,11 +297,29 @@ Actor.main(async () => {
             }
         ]);
         console.log('✅ Session cookie injected');
+
+        // Go to LinkedIn home first (cookie activation)
+        console.log('🏠 Opening LinkedIn home to activate cookie...');
+        await page.goto('https://www.linkedin.com', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(4000);
+
+        // Verify we're logged in
+        if (page.url().includes('/login')) {
+            throw new Error('❌ Not logged in. Cookie invalid or expired.');
+        }
+
+        console.log('✅ Cookie activated, logged in successfully');
         await randomDelay(2, 3);
 
         // Go to connections page
         console.log('👥 Navigating to connections page...');
-        await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', { waitUntil: 'networkidle' });
+        await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
+            waitUntil: 'domcontentloaded',
+            timeout: 60000
+        });
+
+        // Wait for connection links to appear
+        await page.waitForSelector('a[href*="/in/"]', { timeout: 60000 });
         await randomDelay(2, 4);
 
         // Scroll to load connections
