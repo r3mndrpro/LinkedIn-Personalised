@@ -23,28 +23,74 @@ const humanScroll = async (page) => {
 const extractProfileInfo = async (page, profileUrl) => {
     try {
         await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await page.waitForSelector('h1', { timeout: 15000 });
+
+        // Wait for the main profile content to load (try multiple selectors)
+        try {
+            await page.waitForSelector('h1.text-heading-xlarge, h1', { timeout: 10000 });
+        } catch {
+            // If h1 doesn't load, wait a bit and continue
+            await page.waitForTimeout(3000);
+        }
+
         await randomDelay(2, 4);
         await humanScroll(page);
 
         const profileData = await page.evaluate(() => {
             const getText = (selector) => {
-                const element = document.querySelector(selector);
-                return element ? element.innerText.trim() : '';
+                try {
+                    const element = document.querySelector(selector);
+                    return element ? element.innerText.trim() : '';
+                } catch {
+                    return '';
+                }
             };
 
+            // Try multiple selector strategies for each field
+            const name = getText('h1.text-heading-xlarge') ||
+                        getText('h1') ||
+                        getText('.pv-top-card--list li:first-child') ||
+                        getText('[class*="top-card"] h1') ||
+                        '';
+
+            const headline = getText('.text-body-medium.break-words') ||
+                           getText('.pv-top-card--list li:nth-child(2)') ||
+                           getText('[class*="top-card"] .text-body-medium') ||
+                           getText('div[class*="headline"]') ||
+                           '';
+
+            const company = getText('.pv-text-details__right-panel .inline-show-more-text') ||
+                          getText('[class*="experience"] [class*="company"]') ||
+                          '';
+
+            const about = getText('#about ~ .inline-show-more-text') ||
+                         getText('.pv-about-section .inline-show-more-text') ||
+                         getText('[class*="about"] [class*="show-more"]') ||
+                         getText('#about + div') ||
+                         '';
+
+            const location = getText('.text-body-small.inline.t-black--light.break-words') ||
+                           getText('[class*="location"]') ||
+                           getText('.pv-top-card--list-bullet li') ||
+                           '';
+
             return {
-                name: getText('h1.text-heading-xlarge') || getText('.pv-top-card--list li:first-child'),
-                headline: getText('.text-body-medium.break-words') || getText('.pv-top-card--list li:nth-child(2)'),
-                company: getText('.pv-text-details__right-panel .inline-show-more-text') || '',
-                about: getText('#about ~ .inline-show-more-text') || getText('.pv-about-section .inline-show-more-text') || '',
-                location: getText('.text-body-small.inline.t-black--light.break-words') || ''
+                name,
+                headline,
+                company,
+                about,
+                location
             };
         });
 
+        // Validate that we got at least a name
+        if (!profileData.name || profileData.name.length < 2) {
+            console.log(`   ⚠️  No name found, got: "${profileData.name}"`);
+            return null;
+        }
+
         return profileData;
     } catch (error) {
-        console.log(`Error extracting profile from ${profileUrl}:`, error.message);
+        console.log(`   Error extracting profile from ${profileUrl}:`, error.message);
         return null;
     }
 };
@@ -262,7 +308,7 @@ Actor.main(async () => {
     // Launch browser
     console.log('🚀 Launching stealth browser...');
     const browser = await chromium.launch({
-        headless: false, // Set to true for production
+        headless: true, // Running in Apify container
         args: [
             '--disable-blink-features=AutomationControlled',
             '--disable-dev-shm-usage',
