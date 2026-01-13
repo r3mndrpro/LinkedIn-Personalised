@@ -1,0 +1,9 @@
+node_modules/
+.env
+.DS_Store
+*.log
+apify_storage/
+dist/
+.apify/
+QUICK_SETUP.md
+First*.txt

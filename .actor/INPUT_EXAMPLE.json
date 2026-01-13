@@ -1,0 +1,9 @@
+{
+  "linkedinSessionCookie": "AQEDATg4NzE1OTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2NTE2NTg5NjU3Njk1NjE2",
+  "geminiApiKey": "your-gemini-api-key",
+  "messagesPerRun": 4,
+  "maxMessagesPerDay": 30,
+  "demoUrl": "https://voicecallai.netlify.app/",
+  "minDelay": 5,
+  "maxDelay": 15
+}

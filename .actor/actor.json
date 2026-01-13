@@ -1,0 +1,12 @@
+{
+  "actorSpecification": 1,
+  "name": "linkedin-outreach-actor",
+  "title": "LinkedIn AI Outreach Automation",
+  "description": "Scrapes LinkedIn connections, uses AI to identify decision-makers, and sends personalized messages",
+  "version": "1.0.0",
+  "meta": {
+    "templateId": "js-start"
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "./Dockerfile"
+}

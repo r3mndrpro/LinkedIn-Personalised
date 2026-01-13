@@ -1,0 +1,62 @@
+{
+  "title": "LinkedIn AI Outreach Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "linkedinSessionCookie": {
+      "title": "LinkedIn Session Cookie (li_at)",
+      "type": "string",
+      "description": "Your LinkedIn li_at session cookie. Login to LinkedIn, open DevTools (F12), go to Application → Cookies → linkedin.com, copy the 'li_at' cookie value",
+      "editor": "textfield",
+      "isSecret": true,
+      "prefill": "AQEDATg4..."
+    },
+    "geminiApiKey": {
+      "title": "Gemini API Key",
+      "type": "string",
+      "description": "Your Google Gemini API key",
+      "editor": "textfield",
+      "isSecret": true
+    },
+    "messagesPerRun": {
+      "title": "Messages Per Run",
+      "type": "integer",
+      "description": "How many messages to send before stopping (3-5 recommended)",
+      "default": 4,
+      "minimum": 1,
+      "maximum": 10
+    },
+    "maxMessagesPerDay": {
+      "title": "Max Messages Per Day",
+      "type": "integer",
+      "description": "Daily limit for total messages sent",
+      "default": 30,
+      "minimum": 10,
+      "maximum": 50
+    },
+    "demoUrl": {
+      "title": "Voice AI Demo URL",
+      "type": "string",
+      "description": "Your voice AI demo link (default: voicecallai.netlify.app)",
+      "editor": "textfield",
+      "default": "https://voicecallai.netlify.app/"
+    },
+    "minDelay": {
+      "title": "Minimum Delay (seconds)",
+      "type": "integer",
+      "description": "Minimum wait time between actions",
+      "default": 5,
+      "minimum": 3,
+      "maximum": 30
+    },
+    "maxDelay": {
+      "title": "Maximum Delay (seconds)",
+      "type": "integer",
+      "description": "Maximum wait time between actions",
+      "default": 15,
+      "minimum": 5,
+      "maximum": 60
+    }
+  },
+  "required": ["linkedinSessionCookie", "geminiApiKey"]
+}

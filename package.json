@@ -1,0 +1,22 @@
+{
+  "name": "linkedin-outreach-actor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "LinkedIn connection scraper with AI-powered outreach automation",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "apify": "^3.5.1",
+    "playwright": "^1.44.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "@google/generative-ai": "^0.21.0"
+  },
+  "devDependencies": {},
+  "repository": {}
+}
