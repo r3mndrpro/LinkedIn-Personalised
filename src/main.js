@@ -222,22 +222,44 @@ BAD EXAMPLE (feature-dump + vendor tone):
 → Problem: Sounds like a vendor selling features, no context about them
 
 GOOD EXAMPLE (situation-framing + natural tone):
-"Hey Sarah, saw your background in fintech before moving to operations at Acme. Most teams building voice AI eventually want to own their stack instead of renting it—built something for that. Demo here: [link]"
-→ Why it works: References her transition, frames around ownership, not features
+"Hey Sarah, saw your background in fintech before moving to operations at Acme.
+
+Most teams building voice AI eventually want to own their stack instead of renting it. Built something for that.
+
+Demo here: [link]"
+→ Why it works: References her transition, frames around ownership, not features. Proper spacing.
 
 ANOTHER GOOD EXAMPLE:
-"Hey Mike, if you're exploring voice agents, most platforms end up being black boxes you can't customize. Built infrastructure that gives you full control—demo here: [link] if you're curious."
-→ Why it works: Describes their likely frustration (black boxes), positions as solution to real problem
+"Hey Mike, if you're exploring voice agents, most platforms end up being black boxes you can't customize.
+
+Built infrastructure that gives you full control. Demo here: [link] if you're curious."
+→ Why it works: Describes their likely frustration, positions as solution. Clean formatting.
 
 REQUIREMENTS:
 ✅ Use first name only
 ✅ Reference their Experience data if possible (transitions, background, previous roles)
 ✅ Frame around a situation/moment, NOT a feature list
 ✅ Include demo link: ${demoUrl}
-✅ 2-3 sentences maximum
+✅ 2-3 sentences maximum with line breaks between them
 ✅ Natural, conversational tone
 ✅ Soft, low-pressure CTA
 ✅ Focus on actual value: control, ownership, customization, transparency
+
+FORMATTING RULES (CRITICAL):
+✅ PROPER SPACING: Put \n\n (double line break) between each sentence
+✅ PUNCTUATION: ONLY use commas (,), periods (.), and question marks (?)
+✅ End sentences with periods, NOT hyphens or dashes
+
+FORMATTING EXAMPLE:
+"Hey John, saw your background in fintech before moving to operations.
+
+Most teams building voice AI eventually want to own their stack instead of renting it. Built something for that.
+
+Demo here: [link] if you're curious."
+
+❌ STRICTLY FORBIDDEN:
+❌ NO hyphens (-) for pauses or connections - use commas or periods instead
+❌ NO em dashes (—) or en dashes (–) - NEVER use any dashes
 ❌ NO price mentions ($0.08/min, 70% cheaper, etc.)
 ❌ NO competitor comparisons (Vapi, Bland, Retell, or any other services)
 ❌ NO generic "Noticed you're scaling X at Y" hooks
@@ -263,10 +285,32 @@ Write ONLY the message text:`;
 // Send LinkedIn message
 const sendMessage = async (page, profileUrl, message) => {
     try {
+        // CRITICAL: Navigate to profile with full page reload to clear any cached modals
+        console.log(`   → Navigating to ${profileUrl}`);
         await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForSelector('button', { timeout: 15000 });
         await randomDelay(2, 4);
+
+        // Close any existing message modals first (CRITICAL FIX)
+        await page.evaluate(() => {
+            // Close message overlay if exists
+            const closeButtons = document.querySelectorAll('[data-test-modal-close-btn], .msg-overlay-bubble-header__control--close, button[aria-label*="Close"]');
+            closeButtons.forEach(btn => {
+                if (btn && btn.offsetParent !== null) {
+                    btn.click();
+                }
+            });
+        });
+        await randomDelay(1, 2);
+
         await humanScroll(page);
+
+        // Extract profile name for verification
+        const profileName = await page.evaluate(() => {
+            const nameElement = document.querySelector('h1.inline.t-24, h1');
+            return nameElement ? nameElement.innerText.trim() : '';
+        });
+        console.log(`   → Profile name: ${profileName}`);
 
         // Try to find and click the Message button
         const messageButtonClicked = await page.evaluate(() => {
@@ -292,6 +336,33 @@ const sendMessage = async (page, profileUrl, message) => {
         await page.waitForSelector('.msg-form__contenteditable, [role="textbox"]', { timeout: 10000 });
         await randomDelay(1, 2);
 
+        // CRITICAL: Verify we're messaging the correct person
+        const conversationName = await page.evaluate(() => {
+            // Check conversation header for recipient name
+            const headerName = document.querySelector('.msg-overlay-bubble-header__title, .msg-thread-header__title');
+            return headerName ? headerName.innerText.trim() : '';
+        });
+
+        console.log(`   → Conversation with: ${conversationName}`);
+
+        // Verify names match (basic check - first name should appear in both)
+        const profileFirstName = profileName.split(' ')[0].toLowerCase();
+        const conversationLower = conversationName.toLowerCase();
+
+        if (profileFirstName && !conversationLower.includes(profileFirstName)) {
+            throw new Error(`❌ MISMATCH! Profile: ${profileName} but conversation: ${conversationName}`);
+        }
+
+        // Clear any existing text in the input field
+        await page.evaluate(() => {
+            const input = document.querySelector('.msg-form__contenteditable, [role="textbox"]');
+            if (input) {
+                input.innerHTML = '';
+                input.innerText = '';
+            }
+        });
+        await randomDelay(0.5, 1);
+
         // Type message with human-like delays
         await page.type('.msg-form__contenteditable, [role="textbox"]', message, { delay: 50 + Math.random() * 50 });
         await randomDelay(1, 2);
@@ -299,7 +370,7 @@ const sendMessage = async (page, profileUrl, message) => {
         // Click send button
         await page.click('button[type="submit"].msg-form__send-button');
 
-        console.log(`✅ Message sent to ${profileUrl}`);
+        console.log(`✅ Message sent to ${profileName} (${profileUrl})`);
         return true;
     } catch (error) {
         console.log(`❌ Failed to send message to ${profileUrl}:`, error.message);
