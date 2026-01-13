@@ -45,40 +45,49 @@ const extractProfileInfo = async (page, profileUrl) => {
                 }
             };
 
-            // Try multiple selector strategies for each field
-            const name = getText('h1.text-heading-xlarge') ||
+            const getAllText = (selector) => {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    return Array.from(elements).map(el => el.innerText.trim()).filter(text => text.length > 0);
+                } catch {
+                    return [];
+                }
+            };
+
+            // NAME - from actual LinkedIn HTML
+            const name = getText('h1.inline.t-24') ||
                         getText('h1') ||
-                        getText('.pv-top-card--list li:first-child') ||
-                        getText('[class*="top-card"] h1') ||
                         '';
 
-            const headline = getText('.text-body-medium.break-words') ||
-                           getText('.pv-top-card--list li:nth-child(2)') ||
-                           getText('[class*="top-card"] .text-body-medium') ||
-                           getText('div[class*="headline"]') ||
+            // HEADLINE - from actual LinkedIn HTML
+            const headline = getText('div.text-body-medium.break-words[data-generated-suggestion-target]') ||
+                           getText('div.text-body-medium.break-words') ||
                            '';
 
-            const company = getText('.pv-text-details__right-panel .inline-show-more-text') ||
-                          getText('[class*="experience"] [class*="company"]') ||
-                          '';
+            // LOCATION - from actual LinkedIn HTML
+            const location = getText('span.text-body-small.inline.t-black--light.break-words') ||
+                           '';
 
-            const about = getText('#about ~ .inline-show-more-text') ||
-                         getText('.pv-about-section .inline-show-more-text') ||
-                         getText('[class*="about"] [class*="show-more"]') ||
-                         getText('#about + div') ||
+            // COMPANY - from current job section
+            const companyElements = getAllText('div.UxpdjqVyIrVpQWgGQSZOMkxSNOLzswLaLQ');
+            const company = companyElements.length > 0 ? companyElements[0] : '';
+
+            // ABOUT - from actual LinkedIn HTML
+            const about = getText('div.sDjwPkuVwLbixbTbsjXPCfWcLEuUkpMdXmPs') ||
+                         getText('div.full-width.t-14.t-normal.t-black') ||
                          '';
 
-            const location = getText('.text-body-small.inline.t-black--light.break-words') ||
-                           getText('[class*="location"]') ||
-                           getText('.pv-top-card--list-bullet li') ||
-                           '';
+            // EXPERIENCE - get first job title if available
+            const experienceTitles = getAllText('.hoverable-link-text.t-bold');
+            const experience = experienceTitles.length > 0 ? experienceTitles.slice(0, 2).join(', ') : '';
 
             return {
                 name,
                 headline,
                 company,
                 about,
-                location
+                location,
+                experience
             };
         });
 
