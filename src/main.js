@@ -733,50 +733,66 @@ Actor.main(async () => {
         }
 
         // Keep processing until we send 4 messages
-        while (messagesSentThisRun < messagesPerRun) {
-            // Load a batch of connections
-            console.log('📜 Loading more connections...');
-            for (let i = 0; i < 5; i++) {
-                await scrollToBottom(page);
-                await randomDelay(1, 2);
-            }
+        let scrollAttempts = 0;
+        const maxScrollAttempts = 10; // Safety limit
 
-            // Extract connection URLs
+        while (messagesSentThisRun < messagesPerRun && scrollAttempts < maxScrollAttempts) {
+            // Extract connection URLs (LinkedIn shows newest connections FIRST)
             const connectionUrls = await page.evaluate(() => {
                 const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
                 const urls = links
                     .map(link => link.href)
                     .filter(url => url.includes('/in/'))
-                    .filter((url, index, self) => self.indexOf(url) === index); // Remove duplicates
+                    .filter((url, index, self) => self.indexOf(url) === index);
                 return urls;
             });
 
-            console.log(`📋 Found ${connectionUrls.length} total connections on page`);
+            console.log(`📋 Found ${connectionUrls.length} connections on page`);
 
-            // SMART FILTER: Skip URLs already in database OR already checked this run (instant, no API calls)
-            const newUrls = connectionUrls.filter(url =>
-                !processedUrlsThisRun.has(url) && !alreadyProcessedUrls.has(url)
-            );
+            // SMART CHECK: Iterate from TOP until we hit a known profile
+            // LinkedIn shows newest first, so once we hit a known one, all below are also known
+            const newUrls = [];
+            let stoppedAt = null;
 
-            // Count how many we're skipping
-            const skippedFromDb = connectionUrls.filter(url => alreadyProcessedUrls.has(url)).length;
-            const skippedThisRun = connectionUrls.filter(url => processedUrlsThisRun.has(url)).length;
+            for (const url of connectionUrls) {
+                if (processedUrlsThisRun.has(url)) {
+                    continue; // Already checked this run, skip
+                }
 
-            console.log(`📋 ${newUrls.length} new connections to check`);
-            if (skippedFromDb > 0) {
-                console.log(`⏭️  Instantly skipped ${skippedFromDb} already in database (no API calls needed)`);
+                if (alreadyProcessedUrls.has(url)) {
+                    // Hit a known profile - everything below is also known
+                    stoppedAt = url;
+                    break;
+                }
+
+                // This is a NEW profile
+                newUrls.push(url);
             }
 
-            if (newUrls.length === 0) {
-                console.log(`⚠️  No new connections found. Scrolling for more...`);
-                // Don't break, let the while loop continue scrolling
+            if (newUrls.length > 0) {
+                console.log(`🆕 Found ${newUrls.length} NEW connections at top`);
+                if (stoppedAt) {
+                    console.log(`⏭️  Stopped at known profile (skipping all below)`);
+                }
+            } else if (stoppedAt) {
+                console.log(`⏭️  No new connections - first profile already known`);
+                console.log(`📜 Scrolling to load more connections...`);
+                await scrollToBottom(page);
+                await randomDelay(1, 2);
+                scrollAttempts++;
+                continue;
+            } else {
+                console.log(`⚠️  No connections found. Scrolling...`);
+                await scrollToBottom(page);
+                await randomDelay(1, 2);
+                scrollAttempts++;
                 continue;
             }
 
-            // Process new connections
+            // Process new connections (from top)
             let profilesProcessedInBatch = 0;
             for (const profileUrl of newUrls) {
-                processedUrlsThisRun.add(profileUrl); // Mark as processed in this run
+                processedUrlsThisRun.add(profileUrl); // Mark as checked this run
                 profilesProcessedInBatch++;
 
                 // Stop if we've sent enough this run
@@ -895,6 +911,18 @@ Actor.main(async () => {
 
             await randomDelay(minDelay, maxDelay);
             }
+
+            // After processing all new ones, if we still need more messages, scroll to load more
+            if (messagesSentThisRun < messagesPerRun) {
+                console.log(`📜 Need more messages (${messagesSentThisRun}/${messagesPerRun}). Scrolling for more connections...`);
+                await scrollToBottom(page);
+                await randomDelay(1, 2);
+                scrollAttempts++;
+            }
+        }
+
+        if (scrollAttempts >= maxScrollAttempts) {
+            console.log(`⚠️  Reached max scroll attempts (${maxScrollAttempts}). Stopping.`);
         }
 
         console.log('\n📊 Run Complete! Stats:');
