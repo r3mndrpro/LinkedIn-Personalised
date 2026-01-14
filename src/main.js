@@ -734,10 +734,10 @@ Actor.main(async () => {
 
         // Keep processing until we send 4 messages
         let scrollAttempts = 0;
-        const maxScrollAttempts = 10; // Safety limit
+        const maxScrollAttempts = 20; // Safety limit
 
         while (messagesSentThisRun < messagesPerRun && scrollAttempts < maxScrollAttempts) {
-            // Extract connection URLs (LinkedIn shows newest connections FIRST)
+            // Extract connection URLs
             const connectionUrls = await page.evaluate(() => {
                 const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
                 const urls = links
@@ -760,44 +760,46 @@ Actor.main(async () => {
 
             console.log(`📋 Found ${connectionUrls.length} connections on page`);
 
-            // SMART CHECK: Iterate from TOP until we hit a known profile
-            // LinkedIn shows newest first, so once we hit a known one, all below are also known
-            const newUrls = [];
-            let stoppedAt = null;
+            // SMART CHECK: Find the LAST known profile, then process everything AFTER it
+            // This handles any sort order (not just newest-first)
+            let lastKnownIndex = -1;
 
-            for (const url of connectionUrls) {
-                if (processedUrlsThisRun.has(url)) {
-                    continue; // Already checked this run, skip
+            for (let i = 0; i < connectionUrls.length; i++) {
+                const url = connectionUrls[i];
+                if (alreadyProcessedUrls.has(url) || processedUrlsThisRun.has(url)) {
+                    lastKnownIndex = i; // Keep updating to find the LAST known one
                 }
+            }
 
-                if (alreadyProcessedUrls.has(url)) {
-                    // Hit a known profile - everything below is also known
-                    stoppedAt = url;
-                    break;
-                }
+            // Get all URLs AFTER the last known profile
+            const newUrls = connectionUrls
+                .slice(lastKnownIndex + 1) // Everything after last known
+                .filter(url => !processedUrlsThisRun.has(url)); // Not checked this run
 
-                // This is a NEW profile
-                newUrls.push(url);
+            if (lastKnownIndex >= 0) {
+                console.log(`📍 Last known profile at position ${lastKnownIndex + 1}/${connectionUrls.length}`);
             }
 
             if (newUrls.length > 0) {
-                console.log(`🆕 Found ${newUrls.length} NEW connections at top`);
-                if (stoppedAt) {
-                    console.log(`⏭️  Stopped at known profile (skipping all below)`);
-                }
-            } else if (stoppedAt) {
-                console.log(`⏭️  No new connections - first profile already known`);
+                console.log(`🆕 Found ${newUrls.length} NEW connections after position ${lastKnownIndex + 1}`);
+            } else if (lastKnownIndex === connectionUrls.length - 1) {
+                // Last known is at the end - need to scroll for more
+                console.log(`⏭️  All ${connectionUrls.length} profiles already known`);
                 console.log(`📜 Scrolling to load more connections...`);
                 await scrollToBottom(page);
                 await randomDelay(1, 2);
                 scrollAttempts++;
                 continue;
-            } else {
+            } else if (connectionUrls.length === 0) {
                 console.log(`⚠️  No connections found. Scrolling...`);
                 await scrollToBottom(page);
                 await randomDelay(1, 2);
                 scrollAttempts++;
                 continue;
+            } else {
+                // No known profiles at all - process from beginning
+                console.log(`🆕 No known profiles found - processing all ${connectionUrls.length}`);
+                newUrls.push(...connectionUrls.filter(url => !processedUrlsThisRun.has(url)));
             }
 
             // Process new connections (from top)
