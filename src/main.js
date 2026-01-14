@@ -374,7 +374,10 @@ Demo: ${demoUrl}
 
 VOICE AI MARKET FACT TO INCLUDE:
 "${randomFact}"
-→ Weave this fact naturally into the message after the greeting. Don't just drop it in, connect it to their situation or industry.
+→ Put this fact as its OWN clear sentence right after the greeting.
+→ Either as a statement: "Interesting stat: 82% of customers now prefer AI agents over waiting for a human."
+→ Or as a question: "Did you know 82% of customers now prefer AI agents over waiting for a human?"
+→ Keep it on its own line, then continue with the pitch.
 
 ${recentStyles.length > 0 ? `STYLE ROTATION CONTEXT:
 Recent messaging styles used: ${recentStyles.join(', ')}
@@ -409,33 +412,36 @@ PROFESSIONAL SALES PRINCIPLES:
 5. Ultra-short: 3-4 sentences max (including the fact)
 6. No hype words (game-changing, revolutionary, cutting-edge)
 
-BAD EXAMPLE (fact feels forced):
-"Hi Sarah, did you know 82% prefer AI agents? Anyway, I built a voice AI platform..."
-→ Problem: Fact is disconnected, feels like spam
+GOOD EXAMPLE (fact as clear statement):
+"Hey Sarah, saw your background in fintech before moving to operations.
 
-GOOD EXAMPLE (fact woven naturally):
-"Hey Sarah, saw your background in fintech before moving to operations at Acme.
+Interesting stat: 82% of customers now prefer a capable AI agent over waiting for a human.
 
-Interesting stat I came across: 82% of customers now prefer a capable AI agent over waiting for a human. Most teams exploring this space eventually want to own their stack instead of renting it.
+Most teams exploring this space want to own their stack instead of renting it. Built something for that.
 
-Built something for that. Demo here: [link]"
-→ Why it works: Fact flows naturally, connects to the pitch.
+Demo here: [link]"
 
-ANOTHER GOOD EXAMPLE:
+ANOTHER GOOD EXAMPLE (fact as question):
 "Hey Mike, congrats on the Director role.
 
-With 80% of businesses now integrating voice AI into customer service, the ones doing it right are building their own infrastructure instead of renting black boxes.
+Did you know 80% of businesses are now integrating voice AI into customer service?
 
-Demo here if you're curious: [link]"
-→ Why it works: Fact establishes context, then pivots to value prop.
+The ones doing it right are building their own infrastructure instead of renting black boxes. Demo here if curious: [link]"
+
+ANOTHER GOOD EXAMPLE (fact as statement):
+"Hey Lisa, noticed your move to Head of Operations.
+
+Quick stat: companies report saving 40 minutes per day by using voice agents for routine queries.
+
+Built some infrastructure for teams wanting full control over this. Demo: [link]"
 
 REQUIREMENTS:
 ✅ Use first name only
-✅ Include the Voice AI fact naturally after greeting
+✅ Put the Voice AI fact on its OWN line after greeting (as question or statement)
 ✅ Reference their Experience data if possible
 ✅ Frame around a situation/moment, NOT a feature list
 ✅ Include demo link: ${demoUrl}
-✅ 3-4 sentences maximum with line breaks between them
+✅ 4-5 short sentences with line breaks between paragraphs
 ✅ Natural, conversational tone
 ✅ Soft, low-pressure CTA
 
@@ -453,7 +459,6 @@ FORMATTING RULES (CRITICAL):
 ❌ NO feature lists or vendor speak
 ❌ NO pushy language
 ❌ NO emojis or hype words
-❌ NO "Did you know..." openings - weave facts naturally
 
 Write ONLY the message text:`;
 
