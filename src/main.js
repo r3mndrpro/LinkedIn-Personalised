@@ -741,8 +741,19 @@ Actor.main(async () => {
             const connectionUrls = await page.evaluate(() => {
                 const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
                 const urls = links
-                    .map(link => link.href)
-                    .filter(url => url.includes('/in/'))
+                    .map(link => {
+                        const href = link.href;
+                        // Extract just the base profile URL: /in/username/
+                        const match = href.match(/linkedin\.com\/in\/([^\/\?]+)/);
+                        if (match) {
+                            return `https://www.linkedin.com/in/${match[1]}/`;
+                        }
+                        return null;
+                    })
+                    .filter(url => url !== null)
+                    // Filter out any remaining bad URLs (overlays, details, etc.)
+                    .filter(url => !url.includes('/overlay/') && !url.includes('/details/'))
+                    // Remove duplicates
                     .filter((url, index, self) => self.indexOf(url) === index);
                 return urls;
             });
