@@ -9,15 +9,35 @@ const randomDelay = (min, max) => {
     return new Promise(resolve => setTimeout(resolve, delay * 1000));
 };
 
-// Helper function to scroll like a human
-const humanScroll = async (page) => {
+// Helper function to scroll to bottom (trigger lazy loading)
+const scrollToBottom = async (page) => {
     await page.evaluate(() => {
-        window.scrollBy({
-            top: Math.random() * 300 + 200,
+        window.scrollTo({
+            top: document.body.scrollHeight,
             behavior: 'smooth'
         });
     });
-    await randomDelay(1, 3);
+    await randomDelay(2, 3);
+
+    // Also try to click "Show more results" button if it exists
+    const buttonClicked = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const showMoreButton = buttons.find(btn =>
+            btn.innerText.toLowerCase().includes('show more') ||
+            btn.innerText.toLowerCase().includes('load more') ||
+            btn.innerText.toLowerCase().includes('see more')
+        );
+        if (showMoreButton && showMoreButton.offsetParent !== null) {
+            showMoreButton.click();
+            return true;
+        }
+        return false;
+    });
+
+    if (buttonClicked) {
+        console.log('   Clicked "Show more" button');
+        await randomDelay(2, 3);
+    }
 };
 
 // Extract profile information
@@ -34,7 +54,7 @@ const extractProfileInfo = async (page, profileUrl) => {
         }
 
         await randomDelay(2, 4);
-        await humanScroll(page);
+        await scrollToBottom(page);
 
         const profileData = await page.evaluate(() => {
             const getText = (selector) => {
@@ -307,7 +327,7 @@ const sendMessage = async (page, profileUrl, message) => {
         });
         await randomDelay(1, 2);
 
-        await humanScroll(page);
+        await scrollToBottom(page);
 
         // Extract profile name for verification
         const profileName = await page.evaluate(() => {
@@ -492,7 +512,7 @@ Actor.main(async () => {
             // Load a batch of connections
             console.log('📜 Loading more connections...');
             for (let i = 0; i < 5; i++) {
-                await humanScroll(page);
+                await scrollToBottom(page);
                 await randomDelay(1, 2);
             }
 
