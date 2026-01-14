@@ -487,17 +487,22 @@ Actor.main(async () => {
         let previousCount = 0;
         let stableCount = 0;
 
-        // Scroll until we have 100+ connections or no new ones load
+        // Scroll until we have 100+ UNIQUE profile connections
         for (let i = 0; i < 20; i++) {
             await humanScroll(page);
             await randomDelay(1, 2);
 
-            // Check how many connections loaded so far
+            // Check how many UNIQUE profile URLs loaded so far (same logic as extraction)
             const currentCount = await page.evaluate(() => {
-                return document.querySelectorAll('a[href*="/in/"]').length;
+                const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
+                const urls = links
+                    .map(link => link.href)
+                    .filter(url => url.includes('/in/'))
+                    .filter((url, index, self) => self.indexOf(url) === index); // Remove duplicates
+                return urls.length;
             });
 
-            console.log(`   Loaded ${currentCount} connections so far...`);
+            console.log(`   Loaded ${currentCount} unique profile connections so far...`);
 
             // If no new connections loaded for 3 scrolls, we've hit the end
             if (currentCount === previousCount) {
@@ -512,14 +517,14 @@ Actor.main(async () => {
 
             previousCount = currentCount;
 
-            // Stop if we have enough
+            // Stop if we have enough UNIQUE connections
             if (currentCount >= 100) {
                 console.log(`   Loaded enough connections (${currentCount}), stopping scroll`);
                 break;
             }
         }
 
-        // Extract connection URLs
+        // Extract connection URLs (use same logic as counting)
         const connectionUrls = await page.evaluate(() => {
             const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
             const urls = links
