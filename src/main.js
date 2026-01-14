@@ -482,71 +482,50 @@ Actor.main(async () => {
         await page.waitForSelector('a[href*="/in/"]', { timeout: 60000 });
         await randomDelay(2, 4);
 
-        // Scroll to load more connections (LinkedIn lazy loads them)
-        console.log('📜 Loading connections...');
-        let previousCount = 0;
-        let stableCount = 0;
+        let messagesSentThisRun = 0;
+        let evaluatedThisRun = 0;
+        let decisionMakersFoundThisRun = 0;
+        let processedUrls = new Set(); // Track what we've already looked at
 
-        // Scroll until we have 100+ UNIQUE profile connections
-        for (let i = 0; i < 20; i++) {
-            await humanScroll(page);
-            await randomDelay(1, 2);
+        // Keep processing until we send 4 messages
+        while (messagesSentThisRun < messagesPerRun) {
+            // Load a batch of connections
+            console.log('📜 Loading more connections...');
+            for (let i = 0; i < 5; i++) {
+                await humanScroll(page);
+                await randomDelay(1, 2);
+            }
 
-            // Check how many UNIQUE profile URLs loaded so far (same logic as extraction)
-            const currentCount = await page.evaluate(() => {
+            // Extract connection URLs
+            const connectionUrls = await page.evaluate(() => {
                 const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
                 const urls = links
                     .map(link => link.href)
                     .filter(url => url.includes('/in/'))
                     .filter((url, index, self) => self.indexOf(url) === index); // Remove duplicates
-                return urls.length;
+                return urls;
             });
 
-            console.log(`   Loaded ${currentCount} unique profile connections so far...`);
+            console.log(`📋 Found ${connectionUrls.length} total connections on page`);
 
-            // If no new connections loaded for 3 scrolls, we've hit the end
-            if (currentCount === previousCount) {
-                stableCount++;
-                if (stableCount >= 3) {
-                    console.log(`   No more connections loading, stopping scroll`);
+            // Filter out URLs we've already processed in this run
+            const newUrls = connectionUrls.filter(url => !processedUrls.has(url));
+            console.log(`📋 ${newUrls.length} new connections to check`);
+
+            if (newUrls.length === 0) {
+                console.log(`⚠️  No new connections found. Reached end of connections list.`);
+                break;
+            }
+
+            // Process new connections
+            for (const profileUrl of newUrls) {
+                processedUrls.add(profileUrl); // Mark as processed in this run
+
+                // Stop if we've sent enough this run
+                if (messagesSentThisRun >= messagesPerRun) {
+                    console.log(`✅ Sent ${messagesSentThisRun} messages this run. Stopping.`);
                     break;
                 }
-            } else {
-                stableCount = 0;
-            }
-
-            previousCount = currentCount;
-
-            // Stop if we have enough UNIQUE connections
-            if (currentCount >= 100) {
-                console.log(`   Loaded enough connections (${currentCount}), stopping scroll`);
-                break;
-            }
-        }
-
-        // Extract connection URLs (use same logic as counting)
-        const connectionUrls = await page.evaluate(() => {
-            const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
-            const urls = links
-                .map(link => link.href)
-                .filter(url => url.includes('/in/'))
-                .filter((url, index, self) => self.indexOf(url) === index); // Remove duplicates
-            return urls.slice(0, 50); // Process first 50 per run
-        });
-
-        console.log(`📋 Found ${connectionUrls.length} connections to process`);
-
-        let messagesSentThisRun = 0;
-        let evaluatedThisRun = 0;
-        let decisionMakersFoundThisRun = 0;
-
-        // Process each connection
-        for (const profileUrl of connectionUrls) {
-            // Stop if we've sent enough this run
-            if (messagesSentThisRun >= messagesPerRun) {
-                console.log(`✅ Sent ${messagesSentThisRun} messages this run. Stopping.`);
-                break;
-            }
 
             // Check if already processed in Supabase
             console.log(`\n🔍 Checking: ${profileUrl}`);
@@ -653,6 +632,7 @@ Actor.main(async () => {
             }
 
             await randomDelay(minDelay, maxDelay);
+            }
         }
 
         console.log('\n📊 Run Complete! Stats:');
