@@ -340,18 +340,33 @@ const sendMessage = async (page, profileUrl, message) => {
         await page.waitForSelector('.msg-form__contenteditable, [role="textbox"]', { timeout: 10000 });
         await randomDelay(1, 2);
 
-        // Clear any existing text in the input field
-        await page.evaluate(() => {
+        // Clear and type message into contenteditable field
+        await page.evaluate((msg) => {
             const input = document.querySelector('.msg-form__contenteditable, [role="textbox"]');
             if (input) {
+                // Clear existing content
                 input.innerHTML = '';
-                input.innerText = '';
-            }
-        });
-        await randomDelay(0.5, 1);
+                input.focus();
 
-        // Type message with human-like delays
-        await page.type('.msg-form__contenteditable, [role="textbox"]', message, { delay: 50 + Math.random() * 50 });
+                // Split message by line breaks and create proper HTML structure
+                const lines = msg.split('\n');
+                const paragraphs = lines.map(line => {
+                    if (line.trim() === '') {
+                        return '<p><br></p>';
+                    } else {
+                        return `<p>${line}</p>`;
+                    }
+                }).join('');
+
+                // Set the HTML content
+                input.innerHTML = paragraphs;
+
+                // Trigger input event so LinkedIn recognizes the change
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }, message);
+
+        console.log(`   → Message typed successfully`);
         await randomDelay(1, 2);
 
         // Click send button
