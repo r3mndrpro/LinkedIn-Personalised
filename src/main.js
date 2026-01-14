@@ -3,10 +3,89 @@ import { chromium } from 'playwright';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { checkProfile, saveProfile, getRecentMessageStyles } from './supabase-client.js';
 
-// Helper function for random delays
+// Helper function for random delays (with more variance)
 const randomDelay = (min, max) => {
+    // Add slight randomness to make timing less predictable
+    const variance = Math.random() * 0.5; // 0-50% extra variance
     const delay = Math.floor(Math.random() * (max - min + 1)) + min;
-    return new Promise(resolve => setTimeout(resolve, delay * 1000));
+    const finalDelay = delay * (1 + variance);
+    return new Promise(resolve => setTimeout(resolve, finalDelay * 1000));
+};
+
+// Human-like mouse movement simulation
+const simulateHumanMouse = async (page) => {
+    const viewport = page.viewportSize();
+    if (!viewport) return;
+
+    // Random starting position
+    const startX = Math.floor(Math.random() * viewport.width * 0.8) + 100;
+    const startY = Math.floor(Math.random() * viewport.height * 0.8) + 100;
+
+    // Move to random position with slight curve
+    await page.mouse.move(startX, startY, { steps: Math.floor(Math.random() * 10) + 5 });
+
+    // Sometimes hover over an element briefly
+    if (Math.random() > 0.7) {
+        await page.waitForTimeout(Math.floor(Math.random() * 500) + 200);
+    }
+};
+
+// Human-like scroll (not always to bottom)
+const humanScroll = async (page) => {
+    const scrollType = Math.random();
+
+    if (scrollType < 0.3) {
+        // Small scroll
+        await page.evaluate(() => {
+            window.scrollBy({
+                top: Math.floor(Math.random() * 300) + 200,
+                behavior: 'smooth'
+            });
+        });
+    } else if (scrollType < 0.6) {
+        // Medium scroll
+        await page.evaluate(() => {
+            window.scrollBy({
+                top: Math.floor(Math.random() * 600) + 400,
+                behavior: 'smooth'
+            });
+        });
+    } else {
+        // Scroll to load more content
+        await page.evaluate(() => {
+            window.scrollTo({
+                top: document.body.scrollHeight,
+                behavior: 'smooth'
+            });
+        });
+    }
+
+    await randomDelay(0.5, 1.5);
+};
+
+// Random viewport sizes (common resolutions)
+const getRandomViewport = () => {
+    const viewports = [
+        { width: 1920, height: 1080 },
+        { width: 1366, height: 768 },
+        { width: 1536, height: 864 },
+        { width: 1440, height: 900 },
+        { width: 1280, height: 720 },
+        { width: 1600, height: 900 },
+    ];
+    return viewports[Math.floor(Math.random() * viewports.length)];
+};
+
+// Random user agents (recent Chrome versions)
+const getRandomUserAgent = () => {
+    const agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    ];
+    return agents[Math.floor(Math.random() * agents.length)];
 };
 
 // Helper function to scroll to bottom (trigger lazy loading)
@@ -53,7 +132,21 @@ const extractProfileInfo = async (page, profileUrl) => {
             await page.waitForTimeout(3000);
         }
 
+        // Human-like profile viewing: mouse movement + reading pause
+        await simulateHumanMouse(page);
         await randomDelay(2, 4);
+
+        // Scroll down to "read" the profile like a human would
+        await humanScroll(page);
+        await simulateHumanMouse(page);
+        await randomDelay(1, 2);
+
+        // Sometimes scroll more (reading more about them)
+        if (Math.random() > 0.5) {
+            await humanScroll(page);
+            await randomDelay(1, 2);
+        }
+
         await scrollToBottom(page);
 
         const profileData = await page.evaluate(() => {
@@ -327,6 +420,9 @@ const sendMessage = async (page, profileUrl, message) => {
         console.log(`   → Navigating to ${profileUrl}`);
         await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForSelector('button', { timeout: 15000 });
+
+        // Human-like: look around the profile before messaging
+        await simulateHumanMouse(page);
         await randomDelay(2, 4);
 
         // Close any existing message modals first (CRITICAL FIX)
@@ -401,11 +497,14 @@ const sendMessage = async (page, profileUrl, message) => {
         }, message);
 
         console.log(`   → Message typed successfully`);
-        await randomDelay(1, 2);
+
+        // Human-like: "review" the message before sending (pause + mouse movement)
+        await simulateHumanMouse(page);
+        await randomDelay(2, 4); // Pause like reading over the message
 
         // Click send button
         await page.click('button[type="submit"].msg-form__send-button');
-        await randomDelay(1, 2);
+        await randomDelay(2, 3);
 
         // CRITICAL: Close the message modal after sending to prevent persistence
         console.log(`   → Closing message modal...`);
@@ -453,24 +552,64 @@ Actor.main(async () => {
     console.log(`📊 Using Supabase for state persistence: ${supabaseFunctionUrl}`);
     console.log(`📊 Target: ${messagesPerRun} messages this run, max ${maxMessagesPerDay} per day`);
 
-    // Launch browser
+    // Launch browser with enhanced stealth
     console.log('🚀 Launching stealth browser...');
     const browser = await chromium.launch({
-        headless: true, // Running in Apify container
+        headless: true,
         args: [
             '--disable-blink-features=AutomationControlled',
             '--disable-dev-shm-usage',
-            '--no-sandbox'
+            '--no-sandbox',
+            '--disable-infobars',
+            '--disable-background-timer-throttling',
+            '--disable-popup-blocking',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--window-position=0,0',
+            '--ignore-certificate-errors',
+            '--ignore-certificate-errors-spki-list'
         ]
     });
 
+    // Random viewport and user agent for each session
+    const viewport = getRandomViewport();
+    const userAgent = getRandomUserAgent();
+    console.log(`🖥️  Using viewport: ${viewport.width}x${viewport.height}`);
+
     const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        viewport: { width: 1920, height: 1080 },
-        locale: 'en-US'
+        userAgent: userAgent,
+        viewport: viewport,
+        locale: 'en-US',
+        timezoneId: 'America/New_York',
+        geolocation: { longitude: -73.935242, latitude: 40.730610 }, // NYC area
+        permissions: ['geolocation'],
+        // Prevent WebDriver detection
+        bypassCSP: true,
+        ignoreHTTPSErrors: true,
     });
 
     const page = await context.newPage();
+
+    // Additional stealth: override navigator properties
+    await page.addInitScript(() => {
+        // Override webdriver detection
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+
+        // Override plugins to look more human
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [
+                { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                { name: 'Native Client', filename: 'internal-nacl-plugin' }
+            ]
+        });
+
+        // Override languages
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+
+        // Hide automation indicators
+        window.chrome = { runtime: {} };
+    });
 
     try {
         // Set page timeouts (Apify containers are slower)
@@ -503,9 +642,19 @@ Actor.main(async () => {
         }
 
         console.log('✅ Cookie activated, logged in successfully');
-        await randomDelay(2, 3);
 
-        // Go to connections page
+        // Human-like warm-up: browse feed briefly before going to connections
+        console.log('🧑 Simulating human browsing behavior...');
+        await simulateHumanMouse(page);
+        await randomDelay(2, 4);
+
+        // Scroll the feed a bit like a human would
+        for (let i = 0; i < Math.floor(Math.random() * 3) + 1; i++) {
+            await humanScroll(page);
+            await simulateHumanMouse(page);
+            await randomDelay(1, 3);
+        }
+
         console.log('👥 Navigating to connections page...');
         await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
             waitUntil: 'domcontentloaded',
@@ -559,13 +708,22 @@ Actor.main(async () => {
             }
 
             // Process new connections
+            let profilesProcessedInBatch = 0;
             for (const profileUrl of newUrls) {
                 processedUrls.add(profileUrl); // Mark as processed in this run
+                profilesProcessedInBatch++;
 
                 // Stop if we've sent enough this run
                 if (messagesSentThisRun >= messagesPerRun) {
                     console.log(`✅ Sent ${messagesSentThisRun} messages this run. Stopping.`);
                     break;
+                }
+
+                // Micro-break: every 3-5 profiles, take a longer pause (like a human getting distracted)
+                if (profilesProcessedInBatch > 0 && profilesProcessedInBatch % (Math.floor(Math.random() * 3) + 3) === 0) {
+                    console.log('☕ Taking a micro-break (human-like pause)...');
+                    await randomDelay(8, 15);
+                    await simulateHumanMouse(page);
                 }
 
             // Check if already processed in Supabase
