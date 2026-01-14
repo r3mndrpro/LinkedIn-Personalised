@@ -849,7 +849,6 @@ Actor.main(async () => {
             // Process new connections (from top)
             let profilesProcessedInBatch = 0;
             for (const profileUrl of newUrls) {
-                processedUrlsThisRun.add(profileUrl); // Mark as checked this run
                 profilesProcessedInBatch++;
 
                 // Stop if we've sent enough this run
@@ -875,18 +874,17 @@ Actor.main(async () => {
                 continue;
             }
 
-            // CRITICAL: Use the ACTUAL URL (after LinkedIn redirects) to prevent duplicates
-            // ACo... URLs redirect to real username URLs - we use the final URL
+            // Use the ACTUAL URL (after LinkedIn redirects) for saving
             const actualProfileUrl = profileData.actualUrl || profileUrl;
+
+            // Only check for duplicates if URL changed (ACo redirect case)
             if (actualProfileUrl !== profileUrl) {
                 console.log(`   🔀 URL redirected: ${profileUrl.split('/in/')[1]} → ${actualProfileUrl.split('/in/')[1]}`);
-            }
-
-            // Check if this ACTUAL URL was already processed (handles ACo duplicates)
-            if (alreadyProcessedUrls.has(actualProfileUrl) || processedUrlsThisRun.has(actualProfileUrl)) {
-                console.log(`⏭️  Skipping ${profileData.name} - already processed (duplicate ACo URL)`);
-                processedUrlsThisRun.add(actualProfileUrl);
-                continue;
+                // Check if the redirected URL was already processed
+                if (alreadyProcessedUrls.has(actualProfileUrl)) {
+                    console.log(`⏭️  Skipping ${profileData.name} - already processed under different URL`);
+                    continue;
+                }
             }
 
             // CHECK: Only process 1st degree connections (can message them)
