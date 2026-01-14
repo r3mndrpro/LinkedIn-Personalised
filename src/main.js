@@ -88,8 +88,14 @@ const getRandomUserAgent = () => {
     return agents[Math.floor(Math.random() * agents.length)];
 };
 
-// Helper function to scroll to bottom (trigger lazy loading)
+// Helper function to scroll to bottom and wait for new connections to load
 const scrollToBottom = async (page) => {
+    // Get current connection count BEFORE scrolling
+    const countBefore = await page.evaluate(() => {
+        return document.querySelectorAll('a[href*="/in/"]').length;
+    });
+
+    // Scroll to bottom
     await page.evaluate(() => {
         window.scrollTo({
             top: document.body.scrollHeight,
@@ -115,8 +121,30 @@ const scrollToBottom = async (page) => {
 
     if (buttonClicked) {
         console.log('   Clicked "Show more" button');
-        await randomDelay(2, 3);
     }
+
+    // CRITICAL: Wait for NEW connections to actually load into the DOM
+    // Try up to 5 times with increasing delays
+    for (let attempt = 0; attempt < 5; attempt++) {
+        await randomDelay(2, 3);
+
+        const countAfter = await page.evaluate(() => {
+            return document.querySelectorAll('a[href*="/in/"]').length;
+        });
+
+        if (countAfter > countBefore) {
+            console.log(`   📥 Loaded ${countAfter - countBefore} more connections (${countBefore} → ${countAfter})`);
+            return true; // New connections loaded
+        }
+
+        // Scroll again to trigger lazy loading
+        await page.evaluate(() => {
+            window.scrollBy({ top: 500, behavior: 'smooth' });
+        });
+    }
+
+    console.log(`   ⚠️  No new connections loaded after scrolling`);
+    return false; // No new connections loaded
 };
 
 // Extract profile information
@@ -134,6 +162,15 @@ const extractProfileInfo = async (page, profileUrl) => {
 
         // Extra wait to ensure profile fully loads (not just feed/overlay)
         await page.waitForTimeout(2000);
+
+        // CRITICAL: Capture the ACTUAL URL after LinkedIn redirects
+        // This handles ACo... internal IDs redirecting to real usernames
+        const actualUrl = page.url();
+        // Normalize: extract username and rebuild clean URL
+        const urlMatch = actualUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
+        const normalizedUrl = urlMatch
+            ? `https://www.linkedin.com/in/${urlMatch[1]}/`
+            : actualUrl;
 
         // Human-like profile viewing: mouse movement + reading pause
         await simulateHumanMouse(page);
@@ -217,7 +254,11 @@ const extractProfileInfo = async (page, profileUrl) => {
             return null;
         }
 
-        return profileData;
+        // Return profile data with the ACTUAL normalized URL
+        return {
+            ...profileData,
+            actualUrl: normalizedUrl
+        };
     } catch (error) {
         console.log(`   Error extracting profile from ${profileUrl}:`, error.message);
         return null;
@@ -419,120 +460,63 @@ Write ONLY the message text:`;
     }
 };
 
-// Send LinkedIn message
+// Send LinkedIn message - SIMPLE VERSION
 const sendMessage = async (page, profileUrl, message) => {
     try {
-        // CRITICAL: Navigate to profile with full page reload to clear any cached modals
         console.log(`   → Navigating to ${profileUrl}`);
         await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await page.waitForSelector('button', { timeout: 15000 });
+        await page.waitForTimeout(3000);
 
-        // Human-like: look around the profile before messaging
-        await simulateHumanMouse(page);
-        await randomDelay(2, 4);
-
-        // Close any existing message modals first (CRITICAL FIX)
-        await page.evaluate(() => {
-            // Close message overlay if exists
-            const closeButtons = document.querySelectorAll('[data-test-modal-close-btn], .msg-overlay-bubble-header__control--close, button[aria-label*="Close"]');
-            closeButtons.forEach(btn => {
-                if (btn && btn.offsetParent !== null) {
-                    btn.click();
-                }
-            });
-        });
-        await randomDelay(1, 2);
-
-        await scrollToBottom(page);
-
-        // Extract profile name for verification
-        const profileName = await page.evaluate(() => {
-            const nameElement = document.querySelector('h1.inline.t-24, h1');
-            return nameElement ? nameElement.innerText.trim() : '';
-        });
-        console.log(`   → Profile name: ${profileName}`);
-
-        // Try to find and click the Message button
+        // Click Message button
         const messageButtonClicked = await page.evaluate(() => {
-            const buttons = Array.from(document.querySelectorAll('button'));
-            const messageButton = buttons.find(btn =>
-                btn.innerText.toLowerCase().includes('message') &&
-                !btn.disabled
-            );
-            if (messageButton) {
-                messageButton.click();
-                return true;
+            const spans = Array.from(document.querySelectorAll('span.artdeco-button__text'));
+            const messageSpan = spans.find(span => span.innerText.trim() === 'Message');
+            if (messageSpan) {
+                const button = messageSpan.closest('button');
+                if (button && !button.disabled) {
+                    button.click();
+                    return true;
+                }
             }
             return false;
         });
 
         if (!messageButtonClicked) {
-            throw new Error('Message button not found or not clickable');
+            throw new Error('Message button not found');
         }
 
         await randomDelay(2, 3);
 
-        // Wait for message input to appear
-        await page.waitForSelector('.msg-form__contenteditable, [role="textbox"]', { timeout: 10000 });
-        await randomDelay(1, 2);
+        // Wait for message input and type
+        await page.waitForSelector('div.msg-form__contenteditable', { timeout: 10000 });
 
-        // Clear and type message into contenteditable field
+        // Type message using innerHTML + input event (worked before)
         await page.evaluate((msg) => {
-            const input = document.querySelector('.msg-form__contenteditable, [role="textbox"]');
+            const input = document.querySelector('div.msg-form__contenteditable');
             if (input) {
-                // Clear existing content
-                input.innerHTML = '';
                 input.focus();
-
-                // Split message by line breaks and create proper HTML structure
                 const lines = msg.split('\n');
-                const paragraphs = lines.map(line => {
-                    if (line.trim() === '') {
-                        return '<p><br></p>';
-                    } else {
-                        return `<p>${line}</p>`;
-                    }
-                }).join('');
-
-                // Set the HTML content
+                const paragraphs = lines.map(line => line.trim() === '' ? '<p><br></p>' : `<p>${line}</p>`).join('');
                 input.innerHTML = paragraphs;
-
-                // Trigger input event so LinkedIn recognizes the change
                 input.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }, message);
 
-        console.log(`   → Message typed successfully`);
-
-        // Human-like: "review" the message before sending (pause + mouse movement)
-        await simulateHumanMouse(page);
-        await randomDelay(2, 4); // Pause like reading over the message
+        console.log(`   → Message typed`);
+        await randomDelay(2, 3);
 
         // Click send button
-        await page.click('button[type="submit"].msg-form__send-button');
+        await page.click('button.msg-form__send-button');
         await randomDelay(2, 3);
 
-        // CRITICAL: Close the message modal after sending to prevent persistence
-        console.log(`   → Closing message modal...`);
-
-        // Click X button
-        await page.evaluate(() => {
-            const closeButton = document.querySelector('.msg-overlay-bubble-header__control[aria-label*="Close"], .msg-overlay-bubble-header__control.artdeco-button--circle');
-            if (closeButton) {
-                closeButton.click();
-            }
-        });
-
-        // Press ESC key (double guarantee)
+        // Close modal
         await page.keyboard.press('Escape');
+        await randomDelay(1, 2);
 
-        console.log(`   → Modal closed (X button + ESC key)`);
-        await randomDelay(2, 3);
-
-        console.log(`✅ Message sent to ${profileName} (${profileUrl})`);
+        console.log(`✅ Message sent to ${profileUrl}`);
         return true;
     } catch (error) {
-        console.log(`❌ Failed to send message to ${profileUrl}:`, error.message);
+        console.log(`❌ Failed to send message: ${error.message}`);
         return false;
     }
 };
@@ -837,8 +821,26 @@ Actor.main(async () => {
 
             // If no new profiles found, scroll for more
             if (newUrls.length === 0) {
-                console.log(`⏭️  No new connections found. Scrolling...`);
-                await scrollToBottom(page);
+                console.log(`⏭️  No new connections found. Scrolling to load more...`);
+                const loadedMore = await scrollToBottom(page);
+
+                // If scrolling didn't load new connections after several attempts, try reloading
+                if (!loadedMore && scrollAttempts > 0 && scrollAttempts % 5 === 0) {
+                    console.log(`🔄 Reloading connections page to trigger fresh load...`);
+                    await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
+                        waitUntil: 'domcontentloaded',
+                        timeout: 60000
+                    });
+                    await page.waitForSelector('a[href*="/in/"]', { timeout: 30000 });
+                    await randomDelay(3, 5);
+
+                    // Scroll down multiple times to load more connections
+                    console.log(`📜 Scrolling to load connections...`);
+                    for (let i = 0; i < 3; i++) {
+                        await scrollToBottom(page);
+                    }
+                }
+
                 await randomDelay(1, 2);
                 scrollAttempts++;
                 continue;
@@ -870,6 +872,20 @@ Actor.main(async () => {
             const profileData = await extractProfileInfo(page, profileUrl);
             if (!profileData || !profileData.name) {
                 console.log('❌ Failed to extract profile data, skipping');
+                continue;
+            }
+
+            // CRITICAL: Use the ACTUAL URL (after LinkedIn redirects) to prevent duplicates
+            // ACo... URLs redirect to real username URLs - we use the final URL
+            const actualProfileUrl = profileData.actualUrl || profileUrl;
+            if (actualProfileUrl !== profileUrl) {
+                console.log(`   🔀 URL redirected: ${profileUrl.split('/in/')[1]} → ${actualProfileUrl.split('/in/')[1]}`);
+            }
+
+            // Check if this ACTUAL URL was already processed (handles ACo duplicates)
+            if (alreadyProcessedUrls.has(actualProfileUrl) || processedUrlsThisRun.has(actualProfileUrl)) {
+                console.log(`⏭️  Skipping ${profileData.name} - already processed (duplicate ACo URL)`);
+                processedUrlsThisRun.add(actualProfileUrl);
                 continue;
             }
 
@@ -919,7 +935,7 @@ Actor.main(async () => {
             if (!evaluation.isDecisionMaker) {
                 console.log('💾 Saving non-decision-maker to Supabase...');
                 await saveProfile(supabaseFunctionUrl, {
-                    profile_url: profileUrl,
+                    profile_url: actualProfileUrl, // Use actual URL to prevent duplicates
                     name: profileData.name,
                     headline: profileData.headline,
                     company: profileData.company,
@@ -934,7 +950,8 @@ Actor.main(async () => {
                     evaluated_at: new Date().toISOString()
                 });
                 console.log('✅ Saved to Supabase');
-                alreadyProcessedUrls.add(profileUrl); // Add to local cache
+                alreadyProcessedUrls.add(actualProfileUrl); // Add actual URL to local cache
+                processedUrlsThisRun.add(actualProfileUrl); // Also add to this run's cache
                 await randomDelay(minDelay, maxDelay);
                 continue; // Skip to next profile
             }
@@ -951,9 +968,9 @@ Actor.main(async () => {
 
             await randomDelay(minDelay, maxDelay);
 
-            // Send message
+            // Send message (use actualProfileUrl for messaging)
             console.log('📤 Sending message...');
-            const sent = await sendMessage(page, profileUrl, message);
+            const sent = await sendMessage(page, actualProfileUrl, message);
 
             if (sent) {
                 messagesSentThisRun++;
@@ -962,7 +979,7 @@ Actor.main(async () => {
                 // Save to Supabase with message data
                 console.log('💾 Saving decision-maker with message to Supabase...');
                 await saveProfile(supabaseFunctionUrl, {
-                    profile_url: profileUrl,
+                    profile_url: actualProfileUrl, // Use actual URL to prevent duplicates
                     name: profileData.name,
                     headline: profileData.headline,
                     company: profileData.company,
@@ -980,7 +997,8 @@ Actor.main(async () => {
                     message_sent_at: new Date().toISOString()
                 });
                 console.log('✅ Saved to Supabase');
-                alreadyProcessedUrls.add(profileUrl); // Add to local cache
+                alreadyProcessedUrls.add(actualProfileUrl); // Add actual URL to local cache
+                processedUrlsThisRun.add(actualProfileUrl); // Also add to this run's cache
 
                 // Refresh recent styles for next iteration (smart rotation)
                 recentStyles = await getRecentMessageStyles(supabaseFunctionUrl);
