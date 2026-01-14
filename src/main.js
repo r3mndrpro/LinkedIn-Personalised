@@ -347,6 +347,19 @@ const generateMessage = async (genAI, profileData, demoUrl, recentStyles = []) =
 
         const style = availableStyles[Math.floor(Math.random() * availableStyles.length)];
 
+        // Voice AI market facts to include in messages
+        const voiceAIFacts = [
+            "82% of customers now prefer a capable AI agent over waiting in a queue for a human",
+            "80% of businesses have integrated or plan to integrate voice AI into customer service",
+            "Voice AI is saving the US healthcare sector $150 billion this year alone",
+            "AI personalized calls see 36% higher meeting conversion rates than traditional scripts",
+            "Companies report employees saving 40 minutes per day by delegating routine queries to voice agents",
+            "Banking and finance holds the largest voice AI market share at 32.9%",
+            "90% of UK retailers are exploring or implementing AI agents for customer journeys",
+            "157 million voice assistant users in the US alone, and growing"
+        ];
+        const randomFact = voiceAIFacts[Math.floor(Math.random() * voiceAIFacts.length)];
+
         const prompt = `You are a professional reaching out on LinkedIn about a Voice AI infrastructure you built. Write a natural, human-sounding DM.
 
 RECIPIENT PROFILE:
@@ -358,6 +371,10 @@ Experience: ${profileData.experience}
 WHAT YOU BUILT:
 Voice AI infrastructure that gives teams full control and ownership. Sub-1s latency, no black boxes, deploy however you want. Built for teams that want to own their voice AI stack, not rent it.
 Demo: ${demoUrl}
+
+VOICE AI MARKET FACT TO INCLUDE:
+"${randomFact}"
+→ Weave this fact naturally into the message after the greeting. Don't just drop it in, connect it to their situation or industry.
 
 ${recentStyles.length > 0 ? `STYLE ROTATION CONTEXT:
 Recent messaging styles used: ${recentStyles.join(', ')}
@@ -389,48 +406,43 @@ PROFESSIONAL SALES PRINCIPLES:
 2. ONE value point max - don't list features
 3. Write like texting a colleague, not pitching a prospect
 4. Soft CTA - "curious if this fits" not "let's chat"
-5. Ultra-short: 2-3 sentences max
+5. Ultra-short: 3-4 sentences max (including the fact)
 6. No hype words (game-changing, revolutionary, cutting-edge)
 
-BAD EXAMPLE (feature-dump + vendor tone):
-"Hi Sarah, built a voice AI platform with sub-1s latency and full control. We help teams scale without vendor lock-in. Worth a quick chat?"
-→ Problem: Sounds like a vendor selling features, no context about them
+BAD EXAMPLE (fact feels forced):
+"Hi Sarah, did you know 82% prefer AI agents? Anyway, I built a voice AI platform..."
+→ Problem: Fact is disconnected, feels like spam
 
-GOOD EXAMPLE (situation-framing + natural tone):
+GOOD EXAMPLE (fact woven naturally):
 "Hey Sarah, saw your background in fintech before moving to operations at Acme.
 
-Most teams building voice AI eventually want to own their stack instead of renting it. Built something for that.
+Interesting stat I came across: 82% of customers now prefer a capable AI agent over waiting for a human. Most teams exploring this space eventually want to own their stack instead of renting it.
 
-Demo here: [link]"
-→ Why it works: References her transition, frames around ownership, not features. Proper spacing.
+Built something for that. Demo here: [link]"
+→ Why it works: Fact flows naturally, connects to the pitch.
 
 ANOTHER GOOD EXAMPLE:
-"Hey Mike, if you're exploring voice agents, most platforms end up being black boxes you can't customize.
+"Hey Mike, congrats on the Director role.
 
-Built infrastructure that gives you full control. Demo here: [link] if you're curious."
-→ Why it works: Describes their likely frustration, positions as solution. Clean formatting.
+With 80% of businesses now integrating voice AI into customer service, the ones doing it right are building their own infrastructure instead of renting black boxes.
+
+Demo here if you're curious: [link]"
+→ Why it works: Fact establishes context, then pivots to value prop.
 
 REQUIREMENTS:
 ✅ Use first name only
-✅ Reference their Experience data if possible (transitions, background, previous roles)
+✅ Include the Voice AI fact naturally after greeting
+✅ Reference their Experience data if possible
 ✅ Frame around a situation/moment, NOT a feature list
 ✅ Include demo link: ${demoUrl}
-✅ 2-3 sentences maximum with line breaks between them
+✅ 3-4 sentences maximum with line breaks between them
 ✅ Natural, conversational tone
 ✅ Soft, low-pressure CTA
-✅ Focus on actual value: control, ownership, customization, transparency
 
 FORMATTING RULES (CRITICAL):
-✅ PROPER SPACING: Put \n\n (double line break) between each sentence
+✅ PROPER SPACING: Put \n\n (double line break) between paragraphs
 ✅ PUNCTUATION: ONLY use commas (,), periods (.), and question marks (?)
 ✅ End sentences with periods, NOT hyphens or dashes
-
-FORMATTING EXAMPLE:
-"Hey John, saw your background in fintech before moving to operations.
-
-Most teams building voice AI eventually want to own their stack instead of renting it. Built something for that.
-
-Demo here: [link] if you're curious."
 
 ❌ STRICTLY FORBIDDEN:
 ❌ NO hyphens (-) for pauses or connections - use commas or periods instead
@@ -441,6 +453,7 @@ Demo here: [link] if you're curious."
 ❌ NO feature lists or vendor speak
 ❌ NO pushy language
 ❌ NO emojis or hype words
+❌ NO "Did you know..." openings - weave facts naturally
 
 Write ONLY the message text:`;
 
