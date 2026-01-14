@@ -90,3 +90,32 @@ export const getTodayMessageCount = async (supabaseFunctionUrl) => {
         return 0; // Default to 0 on error
     }
 };
+
+/**
+ * Get the last 3 message styles used (for style rotation)
+ * @param {string} supabaseFunctionUrl - Full URL to edge function
+ * @returns {Promise<string[]>} Array of recent style names (up to 3)
+ */
+export const getRecentMessageStyles = async (supabaseFunctionUrl) => {
+    try {
+        const url = `${supabaseFunctionUrl}/recent-styles`;
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (!response.ok) {
+            console.error('Could not fetch recent message styles, returning empty array');
+            return [];
+        }
+
+        const data = await response.json();
+        return data.recent_styles || [];
+    } catch (error) {
+        console.error('Error getting recent message styles:', error.message);
+        return []; // Default to empty array on error
+    }
+};

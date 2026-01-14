@@ -1,7 +1,7 @@
 import { Actor } from 'apify';
 import { chromium } from 'playwright';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { checkProfile, saveProfile } from './supabase-client.js';
+import { checkProfile, saveProfile, getRecentMessageStyles } from './supabase-client.js';
 
 // Helper function for random delays
 const randomDelay = (min, max) => {
@@ -171,11 +171,11 @@ Respond ONLY with a JSON object in this exact format:
 };
 
 // Generate personalized message using Gemini
-const generateMessage = async (genAI, profileData, demoUrl) => {
+const generateMessage = async (genAI, profileData, demoUrl, recentStyles = []) => {
     try {
         const model = genAI.getGenerativeModel({ model: 'models/gemini-3-flash-preview' });
 
-        // Pick a random messaging style (1-4)
+        // All available messaging styles
         const styles = [
             {
                 name: 'Ownership/Control',
@@ -195,7 +195,17 @@ const generateMessage = async (genAI, profileData, demoUrl) => {
             }
         ];
 
-        const style = styles[Math.floor(Math.random() * styles.length)];
+        // Smart style rotation: avoid recently used styles
+        let availableStyles = styles;
+        if (recentStyles.length > 0) {
+            availableStyles = styles.filter(s => !recentStyles.includes(s.name));
+            // If all styles were recently used, reset to full list
+            if (availableStyles.length === 0) {
+                availableStyles = styles;
+            }
+        }
+
+        const style = availableStyles[Math.floor(Math.random() * availableStyles.length)];
 
         const prompt = `You are a professional reaching out on LinkedIn about a Voice AI infrastructure you built. Write a natural, human-sounding DM.
 
@@ -209,7 +219,11 @@ WHAT YOU BUILT:
 Voice AI infrastructure that gives teams full control and ownership. Sub-1s latency, no black boxes, deploy however you want. Built for teams that want to own their voice AI stack, not rent it.
 Demo: ${demoUrl}
 
-MESSAGING APPROACH: ${style.name}
+${recentStyles.length > 0 ? `STYLE ROTATION CONTEXT:
+Recent messaging styles used: ${recentStyles.join(', ')}
+(You've been selected to use a different approach to maintain variety)
+
+` : ''}MESSAGING APPROACH: ${style.name}
 ${style.approach}
 
 CRITICAL FRAMING RULES:
@@ -507,6 +521,13 @@ Actor.main(async () => {
         let decisionMakersFoundThisRun = 0;
         let processedUrls = new Set(); // Track what we've already looked at
 
+        // Fetch recent message styles for smart rotation
+        console.log('🔄 Fetching recent message styles for rotation...');
+        let recentStyles = await getRecentMessageStyles(supabaseFunctionUrl);
+        if (recentStyles.length > 0) {
+            console.log(`   Last ${recentStyles.length} styles used: ${recentStyles.join(', ')}`);
+        }
+
         // Keep processing until we send 4 messages
         while (messagesSentThisRun < messagesPerRun) {
             // Load a batch of connections
@@ -613,7 +634,8 @@ Actor.main(async () => {
 
             // Generate personalized message
             console.log('✍️  Generating personalized message...');
-            const { message, style } = await generateMessage(genAI, profileData, demoUrl);
+            const { message, style } = await generateMessage(genAI, profileData, demoUrl, recentStyles);
+            console.log(`   Style used: ${style}`);
             console.log(`   Message: ${message}`);
 
             await randomDelay(minDelay, maxDelay);
@@ -647,6 +669,9 @@ Actor.main(async () => {
                     message_sent_at: new Date().toISOString()
                 });
                 console.log('✅ Saved to Supabase');
+
+                // Refresh recent styles for next iteration (smart rotation)
+                recentStyles = await getRecentMessageStyles(supabaseFunctionUrl);
             } else {
                 console.log('❌ Message failed to send, not saving to Supabase');
             }
