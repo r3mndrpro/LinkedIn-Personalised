@@ -482,11 +482,41 @@ Actor.main(async () => {
         await page.waitForSelector('a[href*="/in/"]', { timeout: 60000 });
         await randomDelay(2, 4);
 
-        // Scroll to load connections
+        // Scroll to load more connections (LinkedIn lazy loads them)
         console.log('📜 Loading connections...');
-        for (let i = 0; i < 5; i++) {
+        let previousCount = 0;
+        let stableCount = 0;
+
+        // Scroll until we have 100+ connections or no new ones load
+        for (let i = 0; i < 20; i++) {
             await humanScroll(page);
             await randomDelay(1, 2);
+
+            // Check how many connections loaded so far
+            const currentCount = await page.evaluate(() => {
+                return document.querySelectorAll('a[href*="/in/"]').length;
+            });
+
+            console.log(`   Loaded ${currentCount} connections so far...`);
+
+            // If no new connections loaded for 3 scrolls, we've hit the end
+            if (currentCount === previousCount) {
+                stableCount++;
+                if (stableCount >= 3) {
+                    console.log(`   No more connections loading, stopping scroll`);
+                    break;
+                }
+            } else {
+                stableCount = 0;
+            }
+
+            previousCount = currentCount;
+
+            // Stop if we have enough
+            if (currentCount >= 100) {
+                console.log(`   Loaded enough connections (${currentCount}), stopping scroll`);
+                break;
+            }
         }
 
         // Extract connection URLs
