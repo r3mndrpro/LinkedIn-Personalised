@@ -760,46 +760,64 @@ Actor.main(async () => {
 
             console.log(`📋 Found ${connectionUrls.length} connections on page`);
 
-            // SMART CHECK: Find the LAST known profile, then process everything AFTER it
-            // This handles any sort order (not just newest-first)
-            let lastKnownIndex = -1;
-
-            for (let i = 0; i < connectionUrls.length; i++) {
-                const url = connectionUrls[i];
-                if (alreadyProcessedUrls.has(url) || processedUrlsThisRun.has(url)) {
-                    lastKnownIndex = i; // Keep updating to find the LAST known one
-                }
-            }
-
-            // Get all URLs AFTER the last known profile
-            const newUrls = connectionUrls
-                .slice(lastKnownIndex + 1) // Everything after last known
-                .filter(url => !processedUrlsThisRun.has(url)); // Not checked this run
-
-            if (lastKnownIndex >= 0) {
-                console.log(`📍 Last known profile at position ${lastKnownIndex + 1}/${connectionUrls.length}`);
-            }
-
-            if (newUrls.length > 0) {
-                console.log(`🆕 Found ${newUrls.length} NEW connections after position ${lastKnownIndex + 1}`);
-            } else if (lastKnownIndex === connectionUrls.length - 1) {
-                // Last known is at the end - need to scroll for more
-                console.log(`⏭️  All ${connectionUrls.length} profiles already known`);
-                console.log(`📜 Scrolling to load more connections...`);
-                await scrollToBottom(page);
-                await randomDelay(1, 2);
-                scrollAttempts++;
-                continue;
-            } else if (connectionUrls.length === 0) {
+            if (connectionUrls.length === 0) {
                 console.log(`⚠️  No connections found. Scrolling...`);
                 await scrollToBottom(page);
                 await randomDelay(1, 2);
                 scrollAttempts++;
                 continue;
+            }
+
+            // STEP 1: Check if FIRST connection (newest) is new
+            const firstUrl = connectionUrls[0];
+            const firstIsNew = !alreadyProcessedUrls.has(firstUrl) && !processedUrlsThisRun.has(firstUrl);
+
+            let newUrls = [];
+
+            if (firstIsNew) {
+                // NEW connections at top! Collect all new ones from the start
+                console.log(`🆕 First connection is NEW - checking from top...`);
+                for (const url of connectionUrls) {
+                    if (processedUrlsThisRun.has(url)) continue;
+
+                    if (alreadyProcessedUrls.has(url)) {
+                        // Hit a known profile - stop here
+                        console.log(`⏭️  Hit known profile - collected ${newUrls.length} new from top`);
+                        break;
+                    }
+                    newUrls.push(url);
+                }
             } else {
-                // No known profiles at all - process from beginning
-                console.log(`🆕 No known profiles found - processing all ${connectionUrls.length}`);
-                newUrls.push(...connectionUrls.filter(url => !processedUrlsThisRun.has(url)));
+                // STEP 2: First is known - find LAST known and continue after it
+                console.log(`📍 First connection already known - locating last known profile...`);
+
+                let lastKnownIndex = 0;
+                for (let i = 0; i < connectionUrls.length; i++) {
+                    const url = connectionUrls[i];
+                    if (alreadyProcessedUrls.has(url) || processedUrlsThisRun.has(url)) {
+                        lastKnownIndex = i;
+                    }
+                }
+
+                console.log(`📍 Last known at position ${lastKnownIndex + 1}/${connectionUrls.length}`);
+
+                // Get everything AFTER last known
+                newUrls = connectionUrls
+                    .slice(lastKnownIndex + 1)
+                    .filter(url => !processedUrlsThisRun.has(url));
+
+                if (newUrls.length > 0) {
+                    console.log(`🆕 Found ${newUrls.length} NEW after position ${lastKnownIndex + 1}`);
+                }
+            }
+
+            // If no new profiles found, scroll for more
+            if (newUrls.length === 0) {
+                console.log(`⏭️  No new connections found. Scrolling...`);
+                await scrollToBottom(page);
+                await randomDelay(1, 2);
+                scrollAttempts++;
+                continue;
             }
 
             // Process new connections (from top)
