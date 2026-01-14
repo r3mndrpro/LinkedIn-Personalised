@@ -195,13 +195,18 @@ const extractProfileInfo = async (page, profileUrl) => {
             const experienceTitles = getAllText('.hoverable-link-text.t-bold');
             const experience = experienceTitles.length > 0 ? experienceTitles.slice(0, 2).join(', ') : '';
 
+            // CONNECTION DEGREE - check if 1st degree connection
+            const degreeElement = document.querySelector('.distance-badge .dist-value, span.dist-value');
+            const connectionDegree = degreeElement ? degreeElement.innerText.trim() : '';
+
             return {
                 name,
                 headline,
                 company,
                 about,
                 location,
-                experience
+                experience,
+                connectionDegree
             };
         });
 
@@ -544,8 +549,17 @@ Actor.main(async () => {
         demoUrl = 'https://voicecallai.netlify.app/',
         minDelay = 5,
         maxDelay = 15,
-        useResidentialProxy = true
+        useResidentialProxy = true,
+        ownProfileUsername = ''
     } = input;
+
+    // Build own profile URL to skip
+    const ownProfileUrl = ownProfileUsername
+        ? `https://www.linkedin.com/in/${ownProfileUsername}/`
+        : null;
+    if (ownProfileUrl) {
+        console.log(`👤 Will skip own profile: ${ownProfileUrl}`);
+    }
 
     // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(geminiApiKey);
@@ -758,9 +772,18 @@ Actor.main(async () => {
                 return urls;
             });
 
-            console.log(`📋 Found ${connectionUrls.length} connections on page`);
+            // Filter out own profile if specified
+            const filteredUrls = ownProfileUrl
+                ? connectionUrls.filter(url => url !== ownProfileUrl)
+                : connectionUrls;
 
-            if (connectionUrls.length === 0) {
+            if (filteredUrls.length < connectionUrls.length) {
+                console.log(`👤 Skipped own profile from results`);
+            }
+
+            console.log(`📋 Found ${filteredUrls.length} connections on page`);
+
+            if (filteredUrls.length === 0) {
                 console.log(`⚠️  No connections found. Scrolling...`);
                 await scrollToBottom(page);
                 await randomDelay(1, 2);
@@ -769,7 +792,7 @@ Actor.main(async () => {
             }
 
             // STEP 1: Check if FIRST connection (newest) is new
-            const firstUrl = connectionUrls[0];
+            const firstUrl = filteredUrls[0];
             const firstIsNew = !alreadyProcessedUrls.has(firstUrl) && !processedUrlsThisRun.has(firstUrl);
 
             let newUrls = [];
@@ -777,7 +800,7 @@ Actor.main(async () => {
             if (firstIsNew) {
                 // NEW connections at top! Collect all new ones from the start
                 console.log(`🆕 First connection is NEW - checking from top...`);
-                for (const url of connectionUrls) {
+                for (const url of filteredUrls) {
                     if (processedUrlsThisRun.has(url)) continue;
 
                     if (alreadyProcessedUrls.has(url)) {
@@ -792,17 +815,17 @@ Actor.main(async () => {
                 console.log(`📍 First connection already known - locating last known profile...`);
 
                 let lastKnownIndex = 0;
-                for (let i = 0; i < connectionUrls.length; i++) {
-                    const url = connectionUrls[i];
+                for (let i = 0; i < filteredUrls.length; i++) {
+                    const url = filteredUrls[i];
                     if (alreadyProcessedUrls.has(url) || processedUrlsThisRun.has(url)) {
                         lastKnownIndex = i;
                     }
                 }
 
-                console.log(`📍 Last known at position ${lastKnownIndex + 1}/${connectionUrls.length}`);
+                console.log(`📍 Last known at position ${lastKnownIndex + 1}/${filteredUrls.length}`);
 
                 // Get everything AFTER last known
-                newUrls = connectionUrls
+                newUrls = filteredUrls
                     .slice(lastKnownIndex + 1)
                     .filter(url => !processedUrlsThisRun.has(url));
 
@@ -849,7 +872,20 @@ Actor.main(async () => {
                 continue;
             }
 
+            // CHECK: Only process 1st degree connections (can message them)
+            if (profileData.connectionDegree !== '1st') {
+                console.log(`⏭️  Skipping ${profileData.name} - not 1st degree (${profileData.connectionDegree || 'unknown'})`);
+                // Navigate back to connections page
+                await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 60000
+                });
+                await randomDelay(1, 2);
+                continue;
+            }
+
             console.log(`   Name: ${profileData.name}`);
+            console.log(`   Connection: ${profileData.connectionDegree} degree`);
             console.log(`   Headline: ${profileData.headline}`);
             console.log(`   Company: ${profileData.company || 'N/A'}`);
             console.log(`   Location: ${profileData.location || 'N/A'}`);

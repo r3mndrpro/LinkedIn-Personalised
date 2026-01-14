@@ -69,6 +69,12 @@
       "type": "boolean",
       "description": "Use Apify's residential proxies for better stealth (recommended, requires paid plan)",
       "default": true
+    },
+    "ownProfileUsername": {
+      "title": "Your LinkedIn Username",
+      "type": "string",
+      "description": "Your LinkedIn username to skip (e.g., 'john-smith-123456'). Find it in your profile URL: linkedin.com/in/YOUR-USERNAME/",
+      "editor": "textfield"
     }
   },
   "required": ["linkedinSessionCookie", "geminiApiKey", "supabaseFunctionUrl"]
