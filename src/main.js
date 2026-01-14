@@ -124,30 +124,25 @@ const extractProfileInfo = async (page, profileUrl) => {
     try {
         await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        // Wait for the main profile content to load (try multiple selectors)
+        // Wait for the main profile content to load properly
         try {
-            await page.waitForSelector('h1.text-heading-xlarge, h1', { timeout: 10000 });
+            await page.waitForSelector('h1.text-heading-xlarge, h1.inline', { timeout: 15000 });
         } catch {
-            // If h1 doesn't load, wait a bit and continue
-            await page.waitForTimeout(3000);
+            // If h1 doesn't load, wait longer and try again
+            await page.waitForTimeout(5000);
         }
+
+        // Extra wait to ensure profile fully loads (not just feed/overlay)
+        await page.waitForTimeout(2000);
 
         // Human-like profile viewing: mouse movement + reading pause
         await simulateHumanMouse(page);
         await randomDelay(2, 4);
 
-        // Scroll down to "read" the profile like a human would
+        // Scroll down to "read" the profile like a human would (gentle scroll, no button clicking)
         await humanScroll(page);
         await simulateHumanMouse(page);
         await randomDelay(1, 2);
-
-        // Sometimes scroll more (reading more about them)
-        if (Math.random() > 0.5) {
-            await humanScroll(page);
-            await randomDelay(1, 2);
-        }
-
-        await scrollToBottom(page);
 
         const profileData = await page.evaluate(() => {
             const getText = (selector) => {
@@ -196,8 +191,14 @@ const extractProfileInfo = async (page, profileUrl) => {
             const experience = experienceTitles.length > 0 ? experienceTitles.slice(0, 2).join(', ') : '';
 
             // CONNECTION DEGREE - check if 1st degree connection
-            const degreeElement = document.querySelector('.distance-badge .dist-value, span.dist-value');
-            const connectionDegree = degreeElement ? degreeElement.innerText.trim() : '';
+            // Try multiple selectors and clean up whitespace
+            const degreeElement = document.querySelector('.dist-value') ||
+                                 document.querySelector('.distance-badge span[aria-hidden="true"]') ||
+                                 document.querySelector('span.dist-value');
+            let connectionDegree = '';
+            if (degreeElement) {
+                connectionDegree = degreeElement.innerText.replace(/\s+/g, '').trim(); // Remove all whitespace
+            }
 
             return {
                 name,
