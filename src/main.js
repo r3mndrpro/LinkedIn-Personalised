@@ -876,12 +876,23 @@ Actor.main(async () => {
             // CHECK: Only process 1st degree connections (can message them)
             if (profileData.connectionDegree !== '1st') {
                 console.log(`⏭️  Skipping ${profileData.name} - not 1st degree (${profileData.connectionDegree || 'unknown'})`);
+                console.log(`   ↩️  Returning to connections page...`);
+
                 // Navigate back to connections page
                 await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
                     waitUntil: 'domcontentloaded',
                     timeout: 60000
                 });
+
+                // Wait for connections to load
+                try {
+                    await page.waitForSelector('a[href*="/in/"]', { timeout: 10000 });
+                } catch {
+                    await page.waitForTimeout(3000);
+                }
+
                 await randomDelay(1, 2);
+                console.log(`   ✅ Back on connections page, continuing...`);
                 continue;
             }
 
