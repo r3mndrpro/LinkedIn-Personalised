@@ -63,6 +63,12 @@
       "default": 15,
       "minimum": 5,
       "maximum": 60
+    },
+    "useResidentialProxy": {
+      "title": "Use Residential Proxy",
+      "type": "boolean",
+      "description": "Use Apify's residential proxies for better stealth (recommended, requires paid plan)",
+      "default": true
     }
   },
   "required": ["linkedinSessionCookie", "geminiApiKey", "supabaseFunctionUrl"]

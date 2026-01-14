@@ -1,7 +1,7 @@
 import { Actor } from 'apify';
 import { chromium } from 'playwright';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { checkProfile, saveProfile, getRecentMessageStyles } from './supabase-client.js';
+import { checkProfile, saveProfile, getRecentMessageStyles, getAllProcessedUrls } from './supabase-client.js';
 
 // Helper function for random delays (with more variance)
 const randomDelay = (min, max) => {
@@ -543,7 +543,8 @@ Actor.main(async () => {
         maxMessagesPerDay = 30,
         demoUrl = 'https://voicecallai.netlify.app/',
         minDelay = 5,
-        maxDelay = 15
+        maxDelay = 15,
+        useResidentialProxy = true
     } = input;
 
     // Initialize Gemini AI
@@ -551,6 +552,18 @@ Actor.main(async () => {
 
     console.log(`📊 Using Supabase for state persistence: ${supabaseFunctionUrl}`);
     console.log(`📊 Target: ${messagesPerRun} messages this run, max ${maxMessagesPerDay} per day`);
+
+    // Configure residential proxy if enabled
+    let proxyConfiguration = null;
+    if (useResidentialProxy) {
+        console.log('🌐 Using residential proxy for better stealth...');
+        proxyConfiguration = await Actor.createProxyConfiguration({
+            groups: ['RESIDENTIAL'],
+            countryCode: 'US',
+        });
+        const proxyUrl = await proxyConfiguration.newUrl();
+        console.log(`🌐 Proxy configured: ${proxyUrl.split('@')[1] || 'residential'}`);
+    }
 
     // Launch browser with enhanced stealth
     console.log('🚀 Launching stealth browser...');
@@ -576,17 +589,25 @@ Actor.main(async () => {
     const userAgent = getRandomUserAgent();
     console.log(`🖥️  Using viewport: ${viewport.width}x${viewport.height}`);
 
-    const context = await browser.newContext({
+    // Build context options
+    const contextOptions = {
         userAgent: userAgent,
         viewport: viewport,
         locale: 'en-US',
         timezoneId: 'America/New_York',
         geolocation: { longitude: -73.935242, latitude: 40.730610 }, // NYC area
         permissions: ['geolocation'],
-        // Prevent WebDriver detection
         bypassCSP: true,
         ignoreHTTPSErrors: true,
-    });
+    };
+
+    // Add proxy if configured
+    if (proxyConfiguration) {
+        const proxyUrl = await proxyConfiguration.newUrl();
+        contextOptions.proxy = { server: proxyUrl };
+    }
+
+    const context = await browser.newContext(contextOptions);
 
     const page = await context.newPage();
 
@@ -668,7 +689,12 @@ Actor.main(async () => {
         let messagesSentThisRun = 0;
         let evaluatedThisRun = 0;
         let decisionMakersFoundThisRun = 0;
-        let processedUrls = new Set(); // Track what we've already looked at
+        let processedUrlsThisRun = new Set(); // Track what we've already looked at THIS RUN
+
+        // OPTIMIZATION: Fetch ALL processed URLs upfront for instant local lookup
+        console.log('📥 Fetching all previously processed profiles...');
+        const alreadyProcessedUrls = await getAllProcessedUrls(supabaseFunctionUrl);
+        console.log(`   Found ${alreadyProcessedUrls.size} profiles already in database`);
 
         // Fetch recent message styles for smart rotation
         console.log('🔄 Fetching recent message styles for rotation...');
@@ -698,19 +724,30 @@ Actor.main(async () => {
 
             console.log(`📋 Found ${connectionUrls.length} total connections on page`);
 
-            // Filter out URLs we've already processed in this run
-            const newUrls = connectionUrls.filter(url => !processedUrls.has(url));
+            // SMART FILTER: Skip URLs already in database OR already checked this run (instant, no API calls)
+            const newUrls = connectionUrls.filter(url =>
+                !processedUrlsThisRun.has(url) && !alreadyProcessedUrls.has(url)
+            );
+
+            // Count how many we're skipping
+            const skippedFromDb = connectionUrls.filter(url => alreadyProcessedUrls.has(url)).length;
+            const skippedThisRun = connectionUrls.filter(url => processedUrlsThisRun.has(url)).length;
+
             console.log(`📋 ${newUrls.length} new connections to check`);
+            if (skippedFromDb > 0) {
+                console.log(`⏭️  Instantly skipped ${skippedFromDb} already in database (no API calls needed)`);
+            }
 
             if (newUrls.length === 0) {
-                console.log(`⚠️  No new connections found. Reached end of connections list.`);
-                break;
+                console.log(`⚠️  No new connections found. Scrolling for more...`);
+                // Don't break, let the while loop continue scrolling
+                continue;
             }
 
             // Process new connections
             let profilesProcessedInBatch = 0;
             for (const profileUrl of newUrls) {
-                processedUrls.add(profileUrl); // Mark as processed in this run
+                processedUrlsThisRun.add(profileUrl); // Mark as processed in this run
                 profilesProcessedInBatch++;
 
                 // Stop if we've sent enough this run
@@ -726,17 +763,8 @@ Actor.main(async () => {
                     await simulateHumanMouse(page);
                 }
 
-            // Check if already processed in Supabase
-            console.log(`\n🔍 Checking: ${profileUrl}`);
-            const { exists, profile } = await checkProfile(supabaseFunctionUrl, profileUrl);
-
-            if (exists) {
-                console.log(`⏭️  Skipping (already processed on ${profile.evaluated_at})`);
-                console.log(`   Category: ${profile.category}, Message Sent: ${profile.message_sent}`);
-                continue;
-            }
-
-            console.log(`🔍 Processing: ${profileUrl}`);
+            // This is a genuinely new profile - process it
+            console.log(`\n🆕 Processing NEW profile: ${profileUrl}`);
 
             // Extract profile info
             const profileData = await extractProfileInfo(page, profileUrl);
@@ -782,6 +810,7 @@ Actor.main(async () => {
                     evaluated_at: new Date().toISOString()
                 });
                 console.log('✅ Saved to Supabase');
+                alreadyProcessedUrls.add(profileUrl); // Add to local cache
                 await randomDelay(minDelay, maxDelay);
                 continue; // Skip to next profile
             }
@@ -827,6 +856,7 @@ Actor.main(async () => {
                     message_sent_at: new Date().toISOString()
                 });
                 console.log('✅ Saved to Supabase');
+                alreadyProcessedUrls.add(profileUrl); // Add to local cache
 
                 // Refresh recent styles for next iteration (smart rotation)
                 recentStyles = await getRecentMessageStyles(supabaseFunctionUrl);

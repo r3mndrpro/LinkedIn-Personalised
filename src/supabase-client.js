@@ -119,3 +119,32 @@ export const getRecentMessageStyles = async (supabaseFunctionUrl) => {
         return []; // Default to empty array on error
     }
 };
+
+/**
+ * Get all processed profile URLs for fast local lookup
+ * @param {string} supabaseFunctionUrl - Full URL to edge function
+ * @returns {Promise<Set<string>>} Set of all processed profile URLs
+ */
+export const getAllProcessedUrls = async (supabaseFunctionUrl) => {
+    try {
+        const url = `${supabaseFunctionUrl}/processed-urls`;
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (!response.ok) {
+            console.error('Could not fetch processed URLs, returning empty set');
+            return new Set();
+        }
+
+        const data = await response.json();
+        return new Set(data.urls || []);
+    } catch (error) {
+        console.error('Error getting processed URLs:', error.message);
+        return new Set(); // Default to empty set on error
+    }
+};
