@@ -90,9 +90,10 @@ const getRandomUserAgent = () => {
 
 // Helper function to scroll to bottom and wait for new connections to load
 const scrollToBottom = async (page) => {
-    // Get current connection count BEFORE scrolling
+    // Get current connection count BEFORE scrolling (only from connections list)
     const countBefore = await page.evaluate(() => {
-        return document.querySelectorAll('a[href*="/in/"]').length;
+        const cards = document.querySelectorAll('.mn-connection-card a[href*="/in/"], .scaffold-finite-scroll__content a[href*="/in/"]');
+        return cards.length > 0 ? cards.length : document.querySelectorAll('a[href*="/in/"]').length;
     });
 
     // Scroll to bottom
@@ -129,7 +130,8 @@ const scrollToBottom = async (page) => {
         await randomDelay(2, 3);
 
         const countAfter = await page.evaluate(() => {
-            return document.querySelectorAll('a[href*="/in/"]').length;
+            const cards = document.querySelectorAll('.mn-connection-card a[href*="/in/"], .scaffold-finite-scroll__content a[href*="/in/"]');
+            return cards.length > 0 ? cards.length : document.querySelectorAll('a[href*="/in/"]').length;
         });
 
         if (countAfter > countBefore) {
@@ -754,9 +756,36 @@ Actor.main(async () => {
         const maxScrollAttempts = 20; // Safety limit
 
         while (messagesSentThisRun < messagesPerRun && scrollAttempts < maxScrollAttempts) {
-            // Extract connection URLs
+            // IMPORTANT: Verify we're on the connections page (not suggestions or other pages)
+            const currentUrl = page.url();
+            if (!currentUrl.includes('/mynetwork/invite-connect/connections')) {
+                console.log(`⚠️  Not on connections page, navigating back...`);
+                await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 60000
+                });
+                await page.waitForTimeout(3000);
+            }
+
+            // Extract connection URLs - ONLY from the connections list, not suggestions
             const connectionUrls = await page.evaluate(() => {
-                const links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
+                // Target specifically the connection cards in the main list
+                // These are in mn-connection-card elements or the main connections container
+                const connectionCards = document.querySelectorAll('.mn-connection-card a[href*="/in/"], .scaffold-finite-scroll__content a[href*="/in/"]');
+
+                let links;
+                if (connectionCards.length > 0) {
+                    links = Array.from(connectionCards);
+                } else {
+                    // Fallback: get all profile links but try to exclude sidebar
+                    const mainContent = document.querySelector('.scaffold-finite-scroll__content, main, [data-view-name="connections-list"]');
+                    if (mainContent) {
+                        links = Array.from(mainContent.querySelectorAll('a[href*="/in/"]'));
+                    } else {
+                        links = Array.from(document.querySelectorAll('a[href*="/in/"]'));
+                    }
+                }
+
                 const urls = links
                     .map(link => {
                         const href = link.href;
