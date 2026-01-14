@@ -553,16 +553,28 @@ Actor.main(async () => {
     console.log(`📊 Using Supabase for state persistence: ${supabaseFunctionUrl}`);
     console.log(`📊 Target: ${messagesPerRun} messages this run, max ${maxMessagesPerDay} per day`);
 
-    // Configure residential proxy if enabled
-    let proxyConfiguration = null;
+    // Configure proxy if enabled
+    let proxyUrl = null;
     if (useResidentialProxy) {
-        console.log('🌐 Using residential proxy for better stealth...');
-        proxyConfiguration = await Actor.createProxyConfiguration({
-            groups: ['RESIDENTIAL'],
-            countryCode: 'US',
-        });
-        const proxyUrl = await proxyConfiguration.newUrl();
-        console.log(`🌐 Proxy configured: ${proxyUrl.split('@')[1] || 'residential'}`);
+        try {
+            console.log('🌐 Configuring residential proxy...');
+            const proxyConfiguration = await Actor.createProxyConfiguration({
+                groups: ['RESIDENTIAL'],
+                countryCode: 'US',
+            });
+            proxyUrl = await proxyConfiguration.newUrl();
+            console.log(`🌐 Residential proxy ready`);
+        } catch (proxyError) {
+            console.log(`⚠️  Residential proxy failed: ${proxyError.message}`);
+            console.log('🌐 Falling back to datacenter proxy...');
+            try {
+                const dcProxyConfig = await Actor.createProxyConfiguration();
+                proxyUrl = await dcProxyConfig.newUrl();
+                console.log(`🌐 Datacenter proxy ready`);
+            } catch {
+                console.log('⚠️  No proxy available, running without proxy');
+            }
+        }
     }
 
     // Launch browser with enhanced stealth
@@ -602,8 +614,7 @@ Actor.main(async () => {
     };
 
     // Add proxy if configured
-    if (proxyConfiguration) {
-        const proxyUrl = await proxyConfiguration.newUrl();
+    if (proxyUrl) {
         contextOptions.proxy = { server: proxyUrl };
     }
 
@@ -633,9 +644,9 @@ Actor.main(async () => {
     });
 
     try {
-        // Set page timeouts (Apify containers are slower)
-        page.setDefaultTimeout(60000);
-        page.setDefaultNavigationTimeout(60000);
+        // Set page timeouts (longer for proxy connections)
+        page.setDefaultTimeout(90000);
+        page.setDefaultNavigationTimeout(90000);
 
         // Inject LinkedIn session cookie
         console.log('🔐 Injecting LinkedIn session cookie...');
@@ -652,9 +663,27 @@ Actor.main(async () => {
         ]);
         console.log('✅ Session cookie injected');
 
-        // Go to LinkedIn home first (cookie activation)
+        // Go to LinkedIn home first (cookie activation) with retry
         console.log('🏠 Opening LinkedIn home to activate cookie...');
-        await page.goto('https://www.linkedin.com', { waitUntil: 'domcontentloaded' });
+        let navigationSuccess = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                await page.goto('https://www.linkedin.com', {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 90000
+                });
+                navigationSuccess = true;
+                break;
+            } catch (navError) {
+                console.log(`⚠️  Navigation attempt ${attempt}/3 failed: ${navError.message}`);
+                if (attempt < 3) {
+                    console.log('   Retrying in 5 seconds...');
+                    await page.waitForTimeout(5000);
+                } else {
+                    throw navError;
+                }
+            }
+        }
         await page.waitForTimeout(4000);
 
         // Verify we're logged in
